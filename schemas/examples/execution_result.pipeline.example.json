@@ -1,0 +1,71 @@
+{
+  "schema_version": "1.0",
+  "id": "pipeline-2026-02-12T16:10Z-claude-code",
+  "stage": "pipeline",
+  "status": "success",
+  "summary": "Completed pipeline and produced final PRSpec (not published).",
+  "started_at": "2026-02-12T16:01:00Z",
+  "finished_at": "2026-02-12T16:10:00Z",
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "",
+  "artifacts": [],
+  "metrics": {
+    "duration_ms": 540000,
+    "cost_usd": 0.0,
+    "tokens_in": 0,
+    "tokens_out": 0
+  },
+  "errors": [],
+  "warnings": [],
+  "data": {
+    "pipeline_mode": "full",
+    "stage_summary": [],
+    "top_improvements": [],
+    "selected_prspec": {},
+    "final_pr_message": {
+      "title": "Fail duplicate automation scripts when required env vars are missing",
+      "body_markdown": "## What\n...\n\n## Why\n...\n\n## How to verify\n```bash\n...\n```"
+    }
+  },
+  "pr_spec": {
+    "schema_version": "1.0",
+    "id": "prspec-2026-02-12T16:10Z",
+    "repo": {
+      "url": "https://github.com/owner/repo",
+      "owner": "owner",
+      "name": "repo",
+      "default_branch": "main"
+    },
+    "base": {
+      "branch": "main",
+      "sha": "abc1234"
+    },
+    "head": {
+      "branch": "codex/example-branch",
+      "sha": "def5678"
+    },
+    "title": "Example PR title",
+    "body_markdown": "## What\n...\n\n## Why\n...\n\n## How to verify\n```bash\n...\n```",
+    "change_type": "bugfix",
+    "risk": "low",
+    "breaking_change": false,
+    "files_touched": [
+      "scripts/example.ts"
+    ],
+    "test_plan": [
+      "npm test"
+    ],
+    "ai_assistance": {
+      "used": true,
+      "tools": [
+        {
+          "name": "codex-cli",
+          "role": "pipeline"
+        }
+      ],
+      "disclosure_line": "AI-assisted (PR Factory pipeline)."
+    }
+  }
+}
+

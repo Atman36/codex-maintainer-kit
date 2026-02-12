@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0",
+  "id": "publish-2026-02-12T16:14Z-claude-code",
+  "stage": "publish",
+  "status": "success",
+  "summary": "Opened PR for owner/repo from you:codex/example-branch.",
+  "started_at": "2026-02-12T16:12:00Z",
+  "finished_at": "2026-02-12T16:14:00Z",
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "",
+  "artifacts": [],
+  "metrics": {
+    "duration_ms": 120000,
+    "cost_usd": 0.0,
+    "tokens_in": 0,
+    "tokens_out": 0
+  },
+  "errors": [],
+  "warnings": [],
+  "data": {
+    "fork": {
+      "url": "https://github.com/you/repo",
+      "owner": "you",
+      "remote_name": "fork"
+    },
+    "push": {
+      "remote": "fork",
+      "branch": "codex/example-branch"
+    },
+    "pr": {
+      "url": "https://github.com/owner/repo/pull/123",
+      "base": "main",
+      "head": "you:codex/example-branch"
+    },
+    "commands_run": [
+      "gh auth status",
+      "gh repo fork ... --clone=false",
+      "git push -u fork codex/example-branch",
+      "gh pr create ...",
+      "gh pr view ... --json url,number"
+    ]
+  }
+}
+

@@ -4,7 +4,7 @@
 
 ## Overview
 
-Этот каталог содержит 8 агентов PR Factory, преобразованных в формат Skills для использования в различных AI IDE (Claude Code, Codex, Opencode, Kimi). Каждый skill представляет собой специализированного агента с четко определенной ролью в pipeline создания PR.
+Этот каталог содержит 9 агентов PR Factory, преобразованных в формат Skills для использования в различных AI IDE (Claude Code, Codex, Opencode, Kimi). Каждый skill представляет собой специализированного агента с четко определенной ролью в pipeline создания PR.
 
 ## Available Skills
 
@@ -16,6 +16,7 @@
 | [pr-factory-gatekeeper](pr-factory-gatekeeper/) | 3. Selection | Select best candidates and create minimal PRSpecs | Reviewing candidate list, need to decide approve/issue/skip |
 | [pr-factory-implementer](pr-factory-implementer/) | 4. Implementation | Safely implement PRSpec with minimal diff | Have approved PRSpec ready for implementation |
 | [pr-factory-pr-writer](pr-factory-pr-writer/) | 5. PR Message | Write excellent, concise PR messages | Implementation complete, need final PR description |
+| [pr-factory-publisher](pr-factory-publisher/) | 6. Publish | Fork/push/open PR from an implemented PRSpec | User explicitly asked to publish a PR |
 | [pr-factory-critic](pr-factory-critic/) | Gate | Pre-implementation evaluation | Need to evaluate proposed changes before implementation |
 | [pr-factory-architect](pr-factory-architect/) | Alternative | Find small architectural improvements | Looking for refactoring opportunities (<200 LOC) |
 
@@ -72,7 +73,7 @@
                 │
                 ▼
         ┌───────────────┐
-        │  Submit PR    │
+        │  Publisher    │
         └───────────────┘
 ```
 

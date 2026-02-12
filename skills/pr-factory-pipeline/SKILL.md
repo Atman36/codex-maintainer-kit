@@ -28,11 +28,11 @@ Coordinate the PR Factory sequence and hand off outputs between stages.
 ## Mode Selection
 
 - `full` (default):
-  - `scout -> analyst -> critic -> gatekeeper -> implementer -> pr-writer`
+  - `scout -> analyst -> critic -> gatekeeper -> implementer -> pr-writer -> (publisher if requested)`
 - `quick-win`:
-  - `scout -> gatekeeper -> implementer -> pr-writer`
+  - `scout -> gatekeeper -> implementer -> pr-writer -> (publisher if requested)`
 - `architecture`:
-  - `architect -> critic -> gatekeeper -> implementer -> pr-writer`
+  - `architect -> critic -> gatekeeper -> implementer -> pr-writer -> (publisher if requested)`
 
 Detailed per-stage contracts: `references/stage-contracts.md`.
 
@@ -59,23 +59,39 @@ Return JSON conforming to `../../schemas/execution_result.schema.json`:
 ```json
 {
   "schema_version": "1.0",
-  "agent": "pr-factory-pipeline",
-  "status": "success|needs_human|failed",
-  "summary": "Pipeline result and stop/success point",
-  "artifacts": [
-    {
-      "type": "json",
-      "path": "pipeline/stage-summary.json",
-      "description": "Stage-by-stage decisions and outputs"
-    },
-    {
-      "type": "json",
-      "path": "pipeline/final-prspec.json",
-      "description": "Final PRSpec ready for submission"
-    }
-  ]
+  "id": "pipeline-<timestamp>",
+  "stage": "pipeline",
+  "status": "success",
+  "summary": "Completed pipeline (full) and produced final PRSpec",
+  "started_at": "2026-02-12T16:01:00Z",
+  "finished_at": "2026-02-12T16:10:00Z",
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "",
+  "artifacts": [],
+  "metrics": {
+    "duration_ms": 540000,
+    "cost_usd": 0.0,
+    "tokens_in": 0,
+    "tokens_out": 0
+  },
+  "errors": [],
+  "warnings": [],
+  "data": {
+    "pipeline_mode": "full",
+    "stage_summary": [],
+    "top_improvements": [],
+    "selected_prspec": {},
+    "final_pr_message": {}
+  },
+  "pr_spec": {}
 }
 ```
+
+Notes:
+- Keep `artifacts` empty unless you actually wrote those files. If you do write artifacts, prefer `/tmp/pr-factory/<id>/...` to avoid polluting the target repo.
+- If `{{REPO_ROOT}}` is not writable in the current environment, stop before implementation/publishing and return `needs_human` (with a concrete next action for the human).
+- If you do run Publisher, reflect it explicitly in `summary` and include the PR URL under `data` (so the final message can’t contradict the actual actions taken).
 
 ## Quality Standards
 
@@ -83,3 +99,4 @@ Return JSON conforming to `../../schemas/execution_result.schema.json`:
 - Do not skip mandatory gates in `full` and `architecture`.
 - Keep PR scope minimal and mergeable.
 - Preserve deterministic handoff: each stage consumes structured output from previous stage.
+- Return schema-valid `ExecutionResult` (no extra top-level keys; required fields present).

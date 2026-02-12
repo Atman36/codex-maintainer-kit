@@ -6,4 +6,6 @@
 `ExecutionResult.data` is intentionally flexible so you can evolve role outputs
 without breaking the top-level contract.
 
+`ExecutionResult.stage` includes pipeline-oriented values like `pipeline`, `publish`, etc.
+
 Examples are in `schemas/examples/`.

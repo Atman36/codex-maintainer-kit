@@ -28,15 +28,19 @@ Use this file to keep stage handoffs deterministic.
 - Input: implementer output (+ optional diff summary)
 - Output: final PR message and complete PRSpec
 
+7. `pr-factory-publisher` (optional; only if user asked to publish)
+- Input: final PRSpec + `HEAD_BRANCH`
+- Output: publish JSON (`ExecutionResult`) with PR URL (or `skipped` / `needs_human`)
+
 ## Quick-Win Mode
 
-`scout -> gatekeeper -> implementer -> pr-writer`
+`scout -> gatekeeper -> implementer -> pr-writer -> (publisher if requested)`
 
 Use when obvious low-risk change is enough.
 
 ## Architecture Mode
 
-`architect -> critic -> gatekeeper -> implementer -> pr-writer`
+`architect -> critic -> gatekeeper -> implementer -> pr-writer -> (publisher if requested)`
 
 Use when goal is targeted structural improvement (<200 LOC).
 
@@ -46,3 +50,4 @@ Use when goal is targeted structural improvement (<200 LOC).
 - Critic returns `reject` or `revise`.
 - Gatekeeper returns `issue` or `skip`.
 - Implementer returns `failed` or `needs_human`.
+- Publisher returns `failed` or `needs_human` (if publishing was requested).

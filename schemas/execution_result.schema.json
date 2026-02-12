@@ -31,6 +31,7 @@
     "stage": {
       "type": "string",
       "enum": [
+        "pipeline",
         "scout",
         "analysis",
         "gatekeeper",

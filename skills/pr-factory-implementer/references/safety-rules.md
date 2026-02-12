@@ -54,6 +54,10 @@ git status --porcelain
 git branch --show-current
 # Should match {{HEAD_BRANCH}}
 
+# If you need to create a new branch with a slash prefix (e.g. "codex/..."),
+# ensure there is no existing local branch named exactly "codex" (git ref namespace conflict).
+git show-ref --verify --quiet refs/heads/codex && echo "WARNING: local branch 'codex' exists; 'codex/...' branch creation will fail. Rename/delete 'codex' first (needs human decision)."
+
 # Check for untracked files
 git status --short
 # Should not show tool state dirs

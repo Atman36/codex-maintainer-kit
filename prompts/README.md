@@ -13,5 +13,12 @@ Role-specific payload goes into `ExecutionResult.data`.
 
 ## Recommended entrypoint
 - Use `prompts/pipeline.md` for end-to-end ordered workflow:
-  `Scout -> Analyst/Architect -> Critic -> Gatekeeper -> Implementer -> PR Writer`.
+  `Scout -> Analyst/Architect -> Critic -> Gatekeeper -> Implementer -> PR Writer -> Publisher (optional)`.
 - This is the default prompt when user asks "проанализируй директорию с помощью агентов" and mentions `deepresearch`.
+
+## Publishing
+- Use `prompts/publish.md` only when user explicitly asks to fork/push/open a PR.
+
+## User Templates
+- `prompts/user-pipeline-full.md` — готовый текст запроса для full pipeline (до PR Writer, без публикации по умолчанию).
+- `prompts/user-analysis-only.md` — “только анализ” (без изменений кода) + отчёт в отдельном файле.

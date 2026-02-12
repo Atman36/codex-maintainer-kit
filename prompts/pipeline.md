@@ -18,6 +18,7 @@
 4. Gatekeeper
 5. Implementer
 6. PR Writer
+7. Publisher (только если пользователь явно просит создать PR/форк/пуш)
 
 Правила:
 - Минимальный diff, минимум риска, максимум reviewability.
@@ -27,9 +28,14 @@
 
 Вывод:
 - Верни **только JSON** по `schemas/execution_result.schema.json`.
+- Обязательное:
+  - `stage` = `pipeline`
+  - `status` = `success|needs_human|failed`
+  - `id`, `started_at`, `finished_at`, `exit_code`, `metrics`, `errors`, `warnings`, `data`
+- В `pr_spec` положи финальный PRSpec (если дошли до PR Writer).
 - В `data` включи:
   - `pipeline_mode`
-  - `stage_summary[]`
-  - `top_improvements[]`
-  - `selected_prspec`
-  - `final_pr_message`
+  - `stage_summary[]` (сырые JSON-выходы стадий, по порядку)
+  - `top_improvements[]` (3–7/5 кандидатов, как нашли)
+  - `selected_prspec` (дубль PRSpec для удобства; можно совпадать с `pr_spec`)
+  - `final_pr_message` ({title, body_markdown})

@@ -14,7 +14,7 @@ Comprehensive guide to the PR Factory pipeline, stage details, and decision poin
 
 ## Pipeline Overview
 
-The PR Factory pipeline consists of 5 main stages plus 2 optional agents:
+The PR Factory pipeline consists of 5 main stages plus a publish step and optional agents:
 
 **Main Pipeline:**
 1. **Scout** - Quick triage and candidate discovery
@@ -22,6 +22,7 @@ The PR Factory pipeline consists of 5 main stages plus 2 optional agents:
 3. **Gatekeeper** - Candidate selection and PRSpec creation
 4. **Implementer** - Safe implementation
 5. **PR Writer** - Excellent PR message creation
+6. **Publisher** - Fork/push/open PR (only if user explicitly requests publishing)
 
 **Optional Agents:**
 - **Critic** - Pre-implementation quality gate (recommended)
@@ -30,7 +31,7 @@ The PR Factory pipeline consists of 5 main stages plus 2 optional agents:
 ### Typical Flow
 
 ```
-Repository → Scout → Critic → Gatekeeper → Implementer → PR Writer → Submit PR
+Repository → Scout → Critic → Gatekeeper → Implementer → PR Writer → Publisher
                 ↓
             Analyst (optional, if more depth needed)
                 ↓
@@ -403,7 +404,41 @@ Repository → Scout → Critic → Gatekeeper → Implementer → PR Writer →
 - Disclosure line present
 
 **Next Step:**
-- Submit PR (manual or automated)
+- Publish PR (manual or via `pr-factory-publisher`)
+
+### Stage 6: Publisher (Open PR)
+
+**Purpose:** Publish the change as a PR (fork/push/open PR) **only when the user explicitly requests publishing**.
+
+**Inputs:**
+- `{{REPO_ROOT}}` - Local repository path
+- `{{REPO_URL}}` - Upstream repository URL
+- `{{BASE_BRANCH}}` - Base branch
+- `{{HEAD_BRANCH}}` - Head branch (already committed)
+- Final PRSpec JSON (title/body)
+
+**Process:**
+1. Verify clean worktree + correct branch
+2. Run safety gate (forbidden tool state / secret-ish scan) if possible
+3. Ensure `gh` is authenticated
+4. Fork (if needed) and configure remote
+5. Push head branch
+6. Create PR using PRSpec title/body
+7. Verify PR and capture URL
+
+**Output:** `ExecutionResult` with:
+```json
+{
+  "stage": "publish",
+  "status": "success",
+  "data": {
+    "pr": { "url": "https://github.com/owner/repo/pull/123" }
+  }
+}
+```
+
+**Success Criteria:**
+- PR URL is present (never claim a PR exists without it)
 
 ## Decision Points
 
