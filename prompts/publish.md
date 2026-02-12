@@ -17,7 +17,7 @@ If (and only if) the user explicitly asked to publish, push the branch and open 
 
 ## Process
 1) Verify git state: clean worktree, correct branch is checked out, commits exist.
-2) Run safety gate (forbidden paths / secret-ish scan) if available (e.g. `python tools/quality_gate.py --repo {{REPO_ROOT}} --base-ref origin/{{BASE_BRANCH}}` from the PR Factory kit repo root).
+2) Run safety gate (forbidden paths / secret-ish scan + files_touched check) if available (e.g. `python tools/quality_gate.py --repo {{REPO_ROOT}} --base-ref origin/{{BASE_BRANCH}} --prspec {{PRSPEC_JSON}} --enforce-files-touched` from the PR Factory kit repo root).
 3) Ensure GitHub CLI is authenticated (`gh auth status`).
 4) Ensure fork exists and remote is configured.
 5) Push head branch to fork.

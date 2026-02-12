@@ -10,6 +10,7 @@
 - `pr-factory-critic`: Критическая пред-оценка идей/PRSpec до реализации (approve/revise/reject).
 - `pr-factory-gatekeeper`: Отбор кандидатов и формирование минимального mergeable PRSpec.
 - `pr-factory-implementer`: Безопасная реализация PRSpec с проверками.
+- `pr-factory-reviewer`: Пост-ревью `git diff` после реализации (шум/лишние файлы/debug leftovers) до PR Writer.
 - `pr-factory-pr-writer`: Формирование финального PR title/body.
 - `pr-factory-publisher`: Публикация изменений: форк/пуш/создание PR (только по явному запросу пользователя).
 - `pr-factory-architect`: Небольшие архитектурные улучшения (<200 LOC) как альтернативный вход.
@@ -33,8 +34,9 @@
 3. `pr-factory-critic`
 4. `pr-factory-gatekeeper`
 5. `pr-factory-implementer`
-6. `pr-factory-pr-writer`
-7. `pr-factory-publisher` (опционально: только если пользователь просит опубликовать PR)
+6. `pr-factory-reviewer`
+7. `pr-factory-pr-writer`
+8. `pr-factory-publisher` (опционально: только если пользователь просит опубликовать PR)
 
 ### Scope
 

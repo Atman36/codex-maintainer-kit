@@ -14,15 +14,16 @@ Comprehensive guide to the PR Factory pipeline, stage details, and decision poin
 
 ## Pipeline Overview
 
-The PR Factory pipeline consists of 5 main stages plus a publish step and optional agents:
+The PR Factory pipeline consists of 6 main stages plus a publish step and optional agents:
 
 **Main Pipeline:**
 1. **Scout** - Quick triage and candidate discovery
 2. **Analyst** - Deep analysis (optional, alternative to Scout)
 3. **Gatekeeper** - Candidate selection and PRSpec creation
 4. **Implementer** - Safe implementation
-5. **PR Writer** - Excellent PR message creation
-6. **Publisher** - Fork/push/open PR (only if user explicitly requests publishing)
+5. **Reviewer** - Post-implementation diff quality gate
+6. **PR Writer** - Excellent PR message creation
+7. **Publisher** - Fork/push/open PR (only if user explicitly requests publishing)
 
 **Optional Agents:**
 - **Critic** - Pre-implementation quality gate (recommended)
@@ -31,7 +32,7 @@ The PR Factory pipeline consists of 5 main stages plus a publish step and option
 ### Typical Flow
 
 ```
-Repository → Scout → Critic → Gatekeeper → Implementer → PR Writer → Publisher
+Repository → Scout → Critic → Gatekeeper → Implementer → Reviewer → PR Writer → Publisher
                 ↓
             Analyst (optional, if more depth needed)
                 ↓
@@ -51,7 +52,7 @@ Repository → Scout → Critic → Gatekeeper → Implementer → PR Writer →
 
 **Process:**
 1. Read README, CONTRIBUTING, LICENSE
-2. Identify test/lint/build commands
+2. Identify test/lint/build commands and their config file paths
 3. Check repo signals (CI, tests, commits)
 4. Generate 3-7 candidates
 
@@ -64,7 +65,8 @@ Repository → Scout → Critic → Gatekeeper → Implementer → PR Writer →
     "repo_profile": {
       "stack_hints": ["typescript", "react"],
       "ci_detected": ["github-actions"],
-      "commands": {"test": "npm test", "lint": "npm run lint"}
+      "commands": {"test": "npm test", "lint": "npm run lint"},
+      "config_paths": {"test": ["pytest.ini"], "lint": [".eslintrc.json"], "ci": [".github/workflows/ci.yml"]}
     },
     "candidates": [
       {
@@ -319,7 +321,8 @@ Repository → Scout → Critic → Gatekeeper → Implementer → PR Writer →
 1. Verify clean worktree
 2. Implement changes (follow PRSpec exactly)
 3. Run verification (tests, lint, build)
-4. Summarize results
+4. If verification fails: Fix from stderr and retry (up to 3 attempts)
+5. Summarize results
 
 **Output:** ExecutionResult with:
 ```json
@@ -349,6 +352,7 @@ Repository → Scout → Critic → Gatekeeper → Implementer → PR Writer →
 - Touch only necessary files
 - No mass formatting
 - Follow PRSpec exactly
+- For untrusted repos, prefer isolated runtime (Docker/microVM)
 
 **Success Criteria:**
 - Status: success
@@ -357,9 +361,41 @@ Repository → Scout → Critic → Gatekeeper → Implementer → PR Writer →
 - No tool state files
 
 **Next Step:**
-- PR Writer (with implementation result)
+- Reviewer (with implementation result)
 
-### Stage 5: PR Writer (PR Message Creation)
+### Stage 5: Reviewer (Post-Implementation Gate)
+
+**Purpose:** Review git diff quality and scope discipline before PR message generation.
+
+**Inputs:**
+- `{{REPO_ROOT}}` - Workspace path
+- `{{PRSPEC_JSON}}` - Approved PRSpec
+- `{{IMPLEMENT_RESULT_JSON}}` - Implementation result from Implementer
+- `{{DIFF_SUMMARY}}` - Git diff summary (optional)
+
+**Output:** ExecutionResult with:
+```json
+{
+  "stage": "reviewer",
+  "status": "success",
+  "data": {
+    "decision": "pass",
+    "required_fixes": [],
+    "scope_check": {
+      "unexpected_files": []
+    }
+  }
+}
+```
+
+**Success Criteria:**
+- No unexpected files outside `pr_spec.files_touched`
+- No obvious debug/noise leftovers
+
+**Next Step:**
+- PR Writer (with reviewer + implementer outputs)
+
+### Stage 6: PR Writer (PR Message Creation)
 
 **Purpose:** Write excellent, concise PR message from implementation results.
 
@@ -406,7 +442,7 @@ Repository → Scout → Critic → Gatekeeper → Implementer → PR Writer →
 **Next Step:**
 - Publish PR (manual or via `pr-factory-publisher`)
 
-### Stage 6: Publisher (Open PR)
+### Stage 7: Publisher (Open PR)
 
 **Purpose:** Publish the change as a PR (fork/push/open PR) **only when the user explicitly requests publishing**.
 
@@ -479,8 +515,16 @@ Repository → Scout → Critic → Gatekeeper → Implementer → PR Writer →
 
 | Status | Next Step |
 |--------|-----------|
-| success | PR Writer |
+| success | Reviewer |
 | failed | Fix errors or needs_human |
+| needs_human | Manual intervention |
+
+### After Reviewer
+
+| Status | Next Step |
+|--------|-----------|
+| success | PR Writer |
+| retryable | Implementer (fix required) |
 | needs_human | Manual intervention |
 
 ## Data Flow
@@ -559,7 +603,7 @@ Repository → Scout → Critic → Gatekeeper → Implementer → PR Writer →
 }
 ```
 
-### Implementer → PR Writer
+### Implementer → Reviewer
 
 ```json
 {
@@ -620,7 +664,7 @@ Repository → Scout → Critic → Gatekeeper → Implementer → PR Writer →
 - All decisions: issue → needs_human
 - All decisions: skip → Stop
 
-### Gate 5: Implementer → PR Writer
+### Gate 5: Implementer → Reviewer
 
 **Criteria:**
 - ✅ Status: success
@@ -630,6 +674,17 @@ Repository → Scout → Critic → Gatekeeper → Implementer → PR Writer →
 
 **If fails:**
 - status: failed → Fix and retry
+- status: needs_human → Manual intervention
+
+### Gate 6: Reviewer → PR Writer
+
+**Criteria:**
+- ✅ Status: success
+- ✅ No `required_fixes`
+- ✅ No unexpected files outside PRSpec scope
+
+**If fails:**
+- status: retryable → Back to Implementer with `required_fixes`
 - status: needs_human → Manual intervention
 
 ## Error Handling
@@ -676,6 +731,14 @@ Repository → Scout → Critic → Gatekeeper → Implementer → PR Writer →
 | Lint fails | Auto-fix if possible or return retryable |
 | Tool state detected | Abort, return failed |
 
+### Reviewer Errors
+
+| Error | Handling |
+|-------|----------|
+| Unexpected changed files | Return retryable with concrete cleanup list |
+| Debug leftovers found | Return retryable with file-level findings |
+| Scope conflict with product decision | Return needs_human |
+
 ### PR Writer Errors
 
 | Error | Handling |
@@ -692,7 +755,7 @@ Repository → Scout → Critic → Gatekeeper → Implementer → PR Writer →
 
 **Flow:**
 ```
-Scout → Gatekeeper → Implementer → PR Writer
+Scout → Gatekeeper → Implementer → Reviewer → PR Writer
 ```
 
 **When to use:**
@@ -704,6 +767,7 @@ Scout → Gatekeeper → Implementer → PR Writer
 - Scout finds: "Fix broken link in README"
 - Gatekeeper approves (docs, low risk)
 - Implementer fixes link (2 LOC)
+- Reviewer confirms clean diff
 - PR Writer creates concise PR
 - Time: 5-10 minutes
 
@@ -713,7 +777,7 @@ Scout → Gatekeeper → Implementer → PR Writer
 
 **Flow:**
 ```
-Scout → Analyst → Critic → Gatekeeper → Implementer → PR Writer
+Scout → Analyst → Critic → Gatekeeper → Implementer → Reviewer → PR Writer
 ```
 
 **When to use:**
@@ -727,6 +791,7 @@ Scout → Analyst → Critic → Gatekeeper → Implementer → PR Writer
 - Critic approves top candidate
 - Gatekeeper creates PRSpec
 - Implementer adds test (15 LOC)
+- Reviewer confirms scope discipline
 - PR Writer creates excellent PR
 - Time: 15-20 minutes
 
@@ -736,7 +801,7 @@ Scout → Analyst → Critic → Gatekeeper → Implementer → PR Writer
 
 **Flow:**
 ```
-Architect → Critic → Gatekeeper → Implementer → PR Writer
+Architect → Critic → Gatekeeper → Implementer → Reviewer → PR Writer
 ```
 
 **When to use:**
@@ -749,6 +814,7 @@ Architect → Critic → Gatekeeper → Implementer → PR Writer
 - Critic approves (clear benefit, low risk)
 - Gatekeeper creates PRSpec
 - Implementer extracts constant (25 LOC)
+- Reviewer confirms no extra refactor noise
 - PR Writer creates PR
 - Time: 10-15 minutes
 
@@ -758,7 +824,7 @@ Architect → Critic → Gatekeeper → Implementer → PR Writer
 
 **Flow:**
 ```
-Scout → [HUMAN] → Gatekeeper → [HUMAN] → Implementer → [HUMAN] → PR Writer
+Scout → [HUMAN] → Gatekeeper → [HUMAN] → Implementer → [HUMAN] → Reviewer → [HUMAN] → PR Writer
 ```
 
 **When to use:**
@@ -772,7 +838,7 @@ Scout → [HUMAN] → Gatekeeper → [HUMAN] → Implementer → [HUMAN] → PR 
 - Gatekeeper creates PRSpecs
 - Human reviews PRSpecs, selects 1
 - Implementer implements
-- Human reviews diff
+- Reviewer runs, then human reviews findings
 - PR Writer creates PR
 - Human reviews and submits
 - Time: 30-40 minutes (human review time)
@@ -783,9 +849,9 @@ Scout → [HUMAN] → Gatekeeper → [HUMAN] → Implementer → [HUMAN] → PR 
 
 **Flow:**
 ```
-[Repo 1] Scout → Gatekeeper → Implementer → PR Writer
-[Repo 2] Scout → Gatekeeper → Implementer → PR Writer
-[Repo 3] Scout → Analyst → Critic → Gatekeeper → Implementer → PR Writer
+[Repo 1] Scout → Gatekeeper → Implementer → Reviewer → PR Writer
+[Repo 2] Scout → Gatekeeper → Implementer → Reviewer → PR Writer
+[Repo 3] Scout → Analyst → Critic → Gatekeeper → Implementer → Reviewer → PR Writer
 ```
 
 **When to use:**
@@ -851,7 +917,8 @@ The PR Factory workflow is designed to:
 2. **Validate** quality (Critic)
 3. **Select** best candidate (Gatekeeper)
 4. **Implement** safely (Implementer)
-5. **Communicate** clearly (PR Writer)
+5. **Review diff quality** (Reviewer)
+6. **Communicate** clearly (PR Writer)
 
 Each stage has clear inputs, outputs, and success criteria. Quality gates ensure only high-probability PRs proceed. Error handling ensures graceful failures.
 

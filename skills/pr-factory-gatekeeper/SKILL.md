@@ -21,6 +21,7 @@ Select candidates and shape them into minimal, mergeable PRSpecs.
 
 - `{{REPO_ROOT}}` - Workspace path
 - `{{CANDIDATES_JSON}}` - Candidate list JSON (from Scout or Analyst)
+- `{{CRITIC_JSON}}` - Optional critic decision JSON (if present, use as hard constraints)
 - `{{MAX_PRS}}` - Maximum number of PRs to select (default: 1)
 
 ## Goal
@@ -34,6 +35,7 @@ Select up to `{{MAX_PRS}}` candidates and turn each into a **PRSpec** that is:
 ## Process
 
 1. **Evaluate each candidate** against quality criteria
+   - If `{{CRITIC_JSON}}` is provided, treat `scope_cut.keep/drop` and `must_fix_before_implement` as mandatory constraints.
 2. **Make decision** for each: `pr`, `issue`, or `skip`
 3. **Create PRSpec** for approved candidates
 4. **Ensure minimal scope** - reject anything too large or risky
@@ -67,6 +69,7 @@ For detailed PRSpec structure and minimal scope guidelines, see [references/prsp
 ## Rules
 
 - **Do NOT invent requirements**: Use what repo already has
+- **Technical shaping over re-critique**: Critic decides strategic value; Gatekeeper converts approved ideas into minimal executable PRSpec
 - **Reject aesthetic refactors**: "Make it prettier" is not enough
 - **No mass formatting**: Even if code style is inconsistent
 - **No new deps**: Unless candidate explicitly justifies it

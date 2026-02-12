@@ -12,15 +12,12 @@ from __future__ import annotations
 
 import argparse
 import fnmatch
-import hashlib
 import json
-import os
 import re
 import subprocess
-import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 
 DEFAULT_FORBIDDEN_GLOBS = [
@@ -65,24 +62,29 @@ def is_git_repo(repo_root: Path) -> bool:
     return (repo_root / ".git").exists()
 
 
-def git_status_paths(repo_root: Path) -> List[str]:
+def git_status_entries(repo_root: Path) -> List[StatusEntry]:
     """
-    Returns paths that are modified/added/untracked in working tree.
+    Returns modified/added/untracked paths with porcelain status code.
     """
     if not is_git_repo(repo_root):
         return []
     p = run(["git", "status", "--porcelain"], cwd=repo_root)
-    paths: List[str] = []
+    entries: List[StatusEntry] = []
     for line in p.stdout.splitlines():
         if not line.strip():
             continue
         # Format: XY <path> or XY <path> -> <path>
         # e.g. "?? foo.txt", " M src/a.py", "R  old -> new"
+        code = line[:2]
         parts = line[3:].split("->")
         path = parts[-1].strip()
         if path:
-            paths.append(path)
-    return sorted(set(paths))
+            entries.append(StatusEntry(code=code, path=path))
+    return entries
+
+
+def git_status_paths(repo_root: Path) -> List[str]:
+    return sorted({entry.path for entry in git_status_entries(repo_root)})
 
 
 def glob_match(path: str, pattern: str) -> bool:
@@ -155,6 +157,12 @@ class DiffStats:
     insertions: int
     deletions: int
     paths: List[str]
+
+
+@dataclass
+class StatusEntry:
+    code: str
+    path: str
 
 
 def git_diff_stats(repo_root: Path, base_ref: str = "HEAD") -> DiffStats:
@@ -322,12 +330,97 @@ def load_json(path: Path) -> Dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def allowed_files_from_prspec(prspec: Dict[str, Any]) -> List[str]:
+    files = prspec.get("files_touched")
+    if not isinstance(files, list):
+        return []
+    out: List[str] = []
+    for item in files:
+        if isinstance(item, str) and item.strip():
+            out.append(item.strip())
+    return out
+
+
+def matches_allowed(path: str, allowed_patterns: List[str]) -> bool:
+    normalized = path.replace("\\", "/")
+    for pattern in allowed_patterns:
+        p = pattern.replace("\\", "/")
+        if fnmatch.fnmatch(normalized, p):
+            return True
+        # Treat literal path entries as "the file or any child under directory-like path".
+        if normalized == p or normalized.startswith(f"{p.rstrip('/')}/"):
+            return True
+    return False
+
+
+def detect_unplanned_paths(changed_paths: List[str], allowed_patterns: List[str]) -> List[str]:
+    if not allowed_patterns:
+        return changed_paths[:]
+    return sorted([p for p in changed_paths if not matches_allowed(p, allowed_patterns)])
+
+
+def _run_restore(repo_root: Path, tracked_paths: List[str]) -> Optional[str]:
+    if not tracked_paths:
+        return None
+
+    restore_cmd = ["git", "restore", "--staged", "--worktree", "--", *tracked_paths]
+    p = run(restore_cmd, cwd=repo_root)
+    if p.returncode == 0:
+        return None
+
+    # Compatibility fallback for older git versions.
+    checkout_cmd = ["git", "checkout", "--", *tracked_paths]
+    p_checkout = run(checkout_cmd, cwd=repo_root)
+    if p_checkout.returncode != 0:
+        return p_checkout.stderr.strip() or p.stderr.strip() or "git restore/checkout failed"
+
+    unstage_cmd = ["git", "reset", "HEAD", "--", *tracked_paths]
+    p_unstage = run(unstage_cmd, cwd=repo_root)
+    if p_unstage.returncode != 0:
+        return p_unstage.stderr.strip() or "git reset HEAD failed while unstaging unplanned paths"
+    return None
+
+
+def cleanup_unplanned_paths(repo_root: Path,
+                            status_entries: List[StatusEntry],
+                            unplanned_paths: List[str]) -> Dict[str, Any]:
+    unplanned_set = set(unplanned_paths)
+    tracked = sorted([entry.path for entry in status_entries if entry.path in unplanned_set and entry.code != "??"])
+    untracked = sorted([entry.path for entry in status_entries if entry.path in unplanned_set and entry.code == "??"])
+
+    cleaned: List[str] = []
+    errors: List[str] = []
+
+    tracked_err = _run_restore(repo_root, tracked)
+    if tracked_err:
+        errors.append(tracked_err)
+    else:
+        cleaned.extend(tracked)
+
+    if untracked:
+        clean_cmd = ["git", "clean", "-fd", "--", *untracked]
+        p_clean = run(clean_cmd, cwd=repo_root)
+        if p_clean.returncode != 0:
+            errors.append(p_clean.stderr.strip() or "git clean failed for untracked unplanned paths")
+        else:
+            cleaned.extend(untracked)
+
+    return {
+        "cleaned": sorted(cleaned),
+        "errors": errors,
+    }
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="PR Factory quality gate: forbidden files + merge probability.")
     ap.add_argument("--repo", required=True, help="Path to repository root")
     ap.add_argument("--prspec", required=False, help="Path to PRSpec JSON (optional)")
     ap.add_argument("--base-ref", default="HEAD", help="Git base ref for diff (default: HEAD)")
     ap.add_argument("--forbidden", nargs="*", default=None, help="Override forbidden globs")
+    ap.add_argument("--enforce-files-touched", action="store_true",
+                    help="Fail if working-tree changes include files outside PRSpec files_touched.")
+    ap.add_argument("--autoclean-unplanned", action="store_true",
+                    help="Restore/remove unplanned files outside PRSpec files_touched.")
     ap.add_argument("--json", action="store_true", help="Print JSON report to stdout")
     args = ap.parse_args()
 
@@ -335,20 +428,53 @@ def main() -> int:
     if not repo_root.exists():
         raise SystemExit(f"Repo path not found: {repo_root}")
 
-    changed = git_status_paths(repo_root)
+    status_entries = git_status_entries(repo_root)
+    changed = sorted({entry.path for entry in status_entries})
     forbidden_hits = scan_forbidden_paths(repo_root, candidate_paths=changed, forbidden_globs=args.forbidden)
     secret_hits = scan_for_secrets(repo_root, candidate_paths=changed)
     diff = git_diff_stats(repo_root, base_ref=args.base_ref)
     signals = repo_signals(repo_root)
     prspec = load_json(Path(args.prspec)) if args.prspec else None
 
+    files_touched_report: Dict[str, Any] = {}
+    unplanned_paths: List[str] = []
+    if args.enforce_files_touched:
+        if not prspec:
+            raise SystemExit("--enforce-files-touched requires --prspec")
+        allowed_patterns = allowed_files_from_prspec(prspec)
+        unplanned_paths = detect_unplanned_paths(changed, allowed_patterns)
+        files_touched_report = {
+            "enabled": True,
+            "allowed_patterns": allowed_patterns,
+            "unplanned_paths": unplanned_paths,
+            "autoclean_applied": False,
+            "autoclean_errors": [],
+            "autocleaned_paths": [],
+        }
+
+        if args.autoclean_unplanned and unplanned_paths:
+            cleanup = cleanup_unplanned_paths(repo_root, status_entries, unplanned_paths)
+            files_touched_report["autoclean_applied"] = True
+            files_touched_report["autoclean_errors"] = cleanup["errors"]
+            files_touched_report["autocleaned_paths"] = cleanup["cleaned"]
+
+            # Recompute state after cleanup.
+            status_entries = git_status_entries(repo_root)
+            changed = sorted({entry.path for entry in status_entries})
+            forbidden_hits = scan_forbidden_paths(repo_root, candidate_paths=changed, forbidden_globs=args.forbidden)
+            secret_hits = scan_for_secrets(repo_root, candidate_paths=changed)
+            diff = git_diff_stats(repo_root, base_ref=args.base_ref)
+            unplanned_paths = detect_unplanned_paths(changed, allowed_patterns)
+            files_touched_report["unplanned_paths"] = unplanned_paths
+
     report = {
         "repo": str(repo_root),
         "changed_paths": changed,
         "forbidden_hits": forbidden_hits,
         "secret_hits": secret_hits,
+        "files_touched_check": files_touched_report,
         "merge_assessment": merge_probability(prspec, diff, signals, forbidden_hits, secret_hits),
-        "ok": (len(forbidden_hits) == 0 and len(secret_hits) == 0),
+        "ok": (len(forbidden_hits) == 0 and len(secret_hits) == 0 and len(unplanned_paths) == 0),
     }
 
     if args.json:
@@ -363,6 +489,17 @@ def main() -> int:
             print("POTENTIAL SECRETS:")
             for f in secret_hits:
                 print(f"  - {f['path']} ({f['snippet']})")
+        if args.enforce_files_touched:
+            if unplanned_paths:
+                print("UNPLANNED PATHS (outside PRSpec files_touched):")
+                for p in unplanned_paths:
+                    print("  -", p)
+            else:
+                print("Files-touched check: OK")
+            if files_touched_report.get("autoclean_applied"):
+                print(f"Autocleaned: {len(files_touched_report.get('autocleaned_paths', []))}")
+                for err in files_touched_report.get("autoclean_errors", []):
+                    print("AUTOCLEAN ERROR:", err)
         ma = report["merge_assessment"]
         print(f"Merge probability: {ma['probability']:.2f} ({ma['label']})")
         if ma["blockers"]:

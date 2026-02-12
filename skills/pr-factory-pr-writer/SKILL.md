@@ -33,7 +33,8 @@ Produce a clean **PRSpec** with an excellent title/body that maintainers can mer
 2. **Generate git diff summary**: If not provided
 3. **Draft PR title**: Clear, imperative, <120 chars
 4. **Write PR body**: What/Why/How tested/Notes
-5. **Create complete PRSpec**: Include all required fields
+5. **Generate labels**: Suggest 1-3 labels (e.g. `bug`, `enhancement`, `tests`, `docs`)
+6. **Create complete PRSpec**: Include all required fields
 
 For PR message templates and best practices, see [references/pr-message-templates.md](references/pr-message-templates.md).
 
@@ -72,6 +73,7 @@ For PR message templates and best practices, see [references/pr-message-template
 - **Be specific**: Include exact commands, not "run tests"
 - **Be honest**: If you didn't run something, say so
 - **No AI voice**: Avoid "I", "we", "This PR", "This change"
+- **Include labels**: Fill `pr_spec.labels` with concise repository-appropriate labels
 
 ## Output Format
 
@@ -124,6 +126,7 @@ Return JSON conforming to `../../schemas/execution_result.schema.json`:
       "npm test -- validation.test.ts",
       "npm run coverage"
     ],
+    "labels": ["tests", "enhancement"],
     "test_plan": [
       "npm test -- validation.test.ts",
       "npm run coverage"
@@ -150,6 +153,7 @@ Return JSON conforming to `../../schemas/execution_result.schema.json`:
 - **Commands**: Exact commands with output verification
 - **Disclosure**: One short sentence in `ai_assistance.disclosure_line`
 - **Honesty**: If untested, say "Recommended verification:" not "Tested with:"
+- **Labels**: Suggest clear labels in `pr_spec.labels` (1-3 items)
 
 ## AI Disclosure Guidelines
 

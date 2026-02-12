@@ -21,6 +21,7 @@ Find concrete, merge-worthy PR candidates through deep analysis.
 
 - `{{REPO_ROOT}}` - Workspace path
 - `{{FOCUS}}` - Analysis focus area (examples: docs, tests, bugfix, perf, refactor, ci, dx)
+- `{{SCOUT_JSON}}` - Optional Scout output for dynamic focus and config reuse
 
 ## Goal
 
@@ -29,6 +30,8 @@ Produce up to **5** concrete PR candidates that are **likely to be accepted**.
 ## Process
 
 1. **Understand focus area**: What type of improvements are we looking for?
+   - If `{{FOCUS}}` is empty/`auto`, infer from Scout output.
+   - If Scout indicates weak test posture (e.g., low coverage, missing tests, test-related blockers), switch focus to `tests`.
 2. **Analyze codebase**: Read relevant files, check coverage, find gaps
 3. **Identify opportunities**: Concrete improvements that maintainers will want
 4. **Assess quality**: Each candidate meets quality bar (necessity, scope, verifiability)
@@ -69,6 +72,7 @@ Each candidate **must** include:
 - **Prefer low-risk wins**: Docs, tests, small bugfixes, clearer errors, minor perf with proof
 - **Avoid high-risk changes**: Mass formatting, big refactors, dependency changes, API breaks
 - **Output JSON only**: Must conform to `ExecutionResult` schema
+- **Scope context explicitly**: Return `data.related_files` to constrain downstream implementation context
 
 ## Output Format
 
@@ -94,6 +98,12 @@ Return JSON conforming to `../../schemas/execution_result.schema.json`:
   "errors": [],
   "warnings": [],
   "data": {
+    "resolved_focus": "tests",
+    "related_files": [
+      "src/utils/parseURL.ts",
+      "src/utils/parseURL.test.ts",
+      "pytest.ini"
+    ],
     "candidates": [
       {
         "id": "cand-1",

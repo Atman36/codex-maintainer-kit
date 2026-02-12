@@ -4,7 +4,7 @@
 
 ## Overview
 
-Этот каталог содержит 9 агентов PR Factory, преобразованных в формат Skills для использования в различных AI IDE (Claude Code, Codex, Opencode, Kimi). Каждый skill представляет собой специализированного агента с четко определенной ролью в pipeline создания PR.
+Этот каталог содержит 10 агентов PR Factory, преобразованных в формат Skills для использования в различных AI IDE (Claude Code, Codex, Opencode, Kimi). Каждый skill представляет собой специализированного агента с четко определенной ролью в pipeline создания PR.
 
 ## Available Skills
 
@@ -15,8 +15,9 @@
 | [pr-factory-analyst](pr-factory-analyst/) | 2. Deep Analysis | Focused deep analysis producing 5 high-quality candidates | Need targeted analysis in specific area (docs/tests/bugfix/perf) |
 | [pr-factory-gatekeeper](pr-factory-gatekeeper/) | 3. Selection | Select best candidates and create minimal PRSpecs | Reviewing candidate list, need to decide approve/issue/skip |
 | [pr-factory-implementer](pr-factory-implementer/) | 4. Implementation | Safely implement PRSpec with minimal diff | Have approved PRSpec ready for implementation |
-| [pr-factory-pr-writer](pr-factory-pr-writer/) | 5. PR Message | Write excellent, concise PR messages | Implementation complete, need final PR description |
-| [pr-factory-publisher](pr-factory-publisher/) | 6. Publish | Fork/push/open PR from an implemented PRSpec | User explicitly asked to publish a PR |
+| [pr-factory-reviewer](pr-factory-reviewer/) | 5. Review Gate | Maintainer-style post-implementation diff review | Need to catch scope creep/noise before PR writing |
+| [pr-factory-pr-writer](pr-factory-pr-writer/) | 6. PR Message | Write excellent, concise PR messages | Implementation complete, need final PR description |
+| [pr-factory-publisher](pr-factory-publisher/) | 7. Publish | Fork/push/open PR from an implemented PRSpec | User explicitly asked to publish a PR |
 | [pr-factory-critic](pr-factory-critic/) | Gate | Pre-implementation evaluation | Need to evaluate proposed changes before implementation |
 | [pr-factory-architect](pr-factory-architect/) | Alternative | Find small architectural improvements | Looking for refactoring opportunities (<200 LOC) |
 
@@ -67,8 +68,14 @@
                 │
                 ▼ Implementation done
         ┌───────────────┐
-        │  PR Writer    │  Excellent PR message
+        │  Reviewer     │  Post-implementation gate
         │  (Stage 5)    │
+        └───────┬───────┘
+                │
+                ▼ Review passed
+        ┌───────────────┐
+        │  PR Writer    │  Excellent PR message
+        │  (Stage 6)    │
         └───────┬───────┘
                 │
                 ▼
@@ -117,6 +124,7 @@ All skills output JSON conforming to `ExecutionResult` schema.
 ### Tools (../../tools/)
 
 - **quality_gate.py** - Validation tool for PRSpec quality
+- **run_pipeline.py** - Deterministic stage orchestrator with hard gates and implement retries
 - Used by Implementer and PR Writer for verification
 
 ## Placeholders
@@ -130,8 +138,10 @@ Skills use placeholders that must be filled by orchestrator:
 | `{{BASE_BRANCH}}` | Target branch | `main`, `master` |
 | `{{HEAD_BRANCH}}` | Working branch | `fix/null-check` |
 | `{{CANDIDATES_JSON}}` | JSON from previous stage | (Scout/Analyst output) |
+| `{{CRITIC_JSON}}` | Critic decision JSON | (Critic output) |
 | `{{PRSPEC_JSON}}` | PRSpec JSON | (Gatekeeper output) |
 | `{{IMPLEMENT_RESULT_JSON}}` | Implementation result | (Implementer output) |
+| `{{RELATED_FILES}}` | High-signal files for scoped implementation | (Analyst/Scout output) |
 | `{{FOCUS}}` | Analysis focus | `docs`, `tests`, `bugfix` |
 | `{{MAX_PRS}}` | Maximum PRs to select | `1`, `3` |
 | `{{CONSTRAINTS}}` | Additional constraints | (Custom) |
@@ -166,29 +176,29 @@ pr-factory-{name}/
 For fully automated PR creation:
 
 1. Start with `pr-factory-pipeline` (mode: `full`)
-2. Internal order: Scout → Analyst → Critic → Gatekeeper → Implementer → PR Writer
-2. Each stage outputs JSON consumed by next
-3. Critic acts as quality gate
+2. Internal order: Scout → Analyst → Critic → Gatekeeper → Implementer → Reviewer → PR Writer
+3. Each stage outputs JSON consumed by next
+4. Critic and Reviewer act as quality gates
 
 ### Pattern 2: Manual Selection (Interactive)
 
 For manual review at each stage:
 
-1. Scout → (review candidates) → Gatekeeper → (review PRSpec) → Implementer → PR Writer
+1. Scout → (review candidates) → Gatekeeper → (review PRSpec) → Implementer → Reviewer → PR Writer
 2. Human approves at each stage
 
 ### Pattern 3: Quick Win (Fast Track)
 
 For obvious improvements:
 
-1. Scout → Gatekeeper → Implementer → PR Writer
+1. Scout → Gatekeeper → Implementer → Reviewer → PR Writer
 2. Skip Analyst and Critic for low-risk changes
 
 ### Pattern 4: Architectural Focus
 
 For refactoring opportunities:
 
-1. Architect → Critic → Gatekeeper → Implementer → PR Writer
+1. Architect → Critic → Gatekeeper → Implementer → Reviewer → PR Writer
 2. Focus on one small architectural improvement
 
 ## Quality Gates
@@ -213,10 +223,15 @@ For refactoring opportunities:
 - Decision: `pr` (not `issue` or `skip`)
 - Test plan defined
 
-### Implementer → PR Writer
+### Implementer → Reviewer
 - Status: `success` (not `failed` or `needs_human`)
 - All tests passed
 - No tool state files committed
+
+### Reviewer → PR Writer
+- Status: `success` (not `retryable` or `needs_human`)
+- No unexpected files outside `pr_spec.files_touched`
+- No debug/noise findings left unresolved
 
 ## IDE Integration
 

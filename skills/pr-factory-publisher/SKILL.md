@@ -39,7 +39,8 @@ Publish an implemented change as a GitHub pull request.
 2. **Run safety gate (recommended)**
    - Scan for forbidden tool-state files and secret-ish strings before pushing.
    - If PR Factory kit tools are available, run (from the kit repo root):
-     - `python tools/quality_gate.py --repo {{REPO_ROOT}} --base-ref origin/{{BASE_BRANCH}}`
+     - `python tools/quality_gate.py --repo {{REPO_ROOT}} --base-ref origin/{{BASE_BRANCH}} --prspec {{PRSPEC_JSON}} --enforce-files-touched`
+     - Optional strict cleanup: add `--autoclean-unplanned`
    - If the repo has no `origin/{{BASE_BRANCH}}`, run against `HEAD` or skip and record a warning.
 
 3. **Check GitHub CLI readiness**

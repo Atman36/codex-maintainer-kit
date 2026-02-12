@@ -22,6 +22,7 @@ Implement PRSpec changes safely and verify they work.
 - `{{REPO_ROOT}}` - Workspace path
 - `{{HEAD_BRANCH}}` - Head branch (already checked out)
 - `{{PRSPEC_JSON}}` - PRSpec JSON (approved by Gatekeeper)
+- `{{RELATED_FILES}}` - Optional high-signal file list from Analyst/Scout
 - `{{CONSTRAINTS}}` - Additional constraints (optional)
 - `{{ALLOWED_COMMANDS}}` - Allowed verification commands (optional)
 
@@ -32,9 +33,11 @@ Implement **exactly** what PRSpec describes, keep diff small, and make checks pa
 ## Process
 
 1. **Verify clean worktree**: No unrelated changes, correct branch
-2. **Implement changes**: Follow PRSpec precisely
-3. **Run verification**: Tests, linters, build (from PRSpec or discovered)
-4. **Summarize results**: Changed files, commands run, test output
+2. **Scope context**: Read only PRSpec `files_touched`, `{{RELATED_FILES}}` (if provided), and direct dependencies
+3. **Implement changes**: Follow PRSpec precisely
+4. **Run verification**: Tests, linters, build (from PRSpec or discovered)
+5. **Self-heal loop**: If verification fails, run up to 3 cycles `Fix (from stderr) -> Verify`
+6. **Summarize results**: Changed files, commands run, test output
 
 For detailed safety rules and worktree hygiene, see [references/safety-rules.md](references/safety-rules.md).
 
@@ -53,6 +56,11 @@ For detailed safety rules and worktree hygiene, see [references/safety-rules.md]
 
 These are local tool state and must NEVER be committed to the repository.
 
+### Sandbox for Untrusted Repos
+
+- Prefer running Implementer in an isolated environment (Docker/microVM) when repository trust is unknown.
+- If the environment is explicitly non-isolated and risk budget is low, return `needs_human` before running install/build scripts.
+
 ### Keep Diff Small
 
 - **Touch only necessary files**: Don't refactor unrelated code
@@ -65,6 +73,8 @@ These are local tool state and must NEVER be committed to the repository.
 - **Don't expand scope**: If PRSpec says "add test", don't also fix nearby bugs
 - **Use specified files**: If PRSpec says "src/utils/validation.test.ts", touch that file only
 - **Match change type**: If PRSpec says "test", don't modify production code (unless test depends on it)
+- **Cleanup out-of-scope edits**: If unrelated files changed, explicitly revert them:
+  - `git checkout -- <unplanned-file-1> <unplanned-file-2> ...`
 
 ### Dependency Changes
 
@@ -100,8 +110,9 @@ If repo has build step:
 
 If verification fails:
 1. **Check error message**: Is it related to your changes?
-2. **Fix if simple**: Typo, missing import, obvious mistake
-3. **Report if complex**: Can't fix → set status to `retryable` or `needs_human`
+2. **Fix from stderr**: Typo, missing import, obvious API mismatch
+3. **Retry verification**: Up to 3 attempts total
+4. **Escalate if complex**: After max attempts, set status to `retryable` or `needs_human`
 
 ## Output Format
 
@@ -167,3 +178,4 @@ Return JSON conforming to `../../schemas/execution_result.schema.json`:
 - **Clean worktree**: Only changes related to PRSpec
 - **No tool state**: Never commit `.claude/`, `.agentplane/`, etc.
 - **Exact verification**: Run exact commands from PRSpec test_plan
+- **Retry budget respected**: At most 3 self-heal attempts before escalation

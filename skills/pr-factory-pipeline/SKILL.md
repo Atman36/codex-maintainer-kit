@@ -5,7 +5,7 @@ description: |
 
   Use when:
   - User asks for full PR Factory flow "по порядку" / end-to-end
-  - Need one coordinator skill to run Scout → Analyst/Architect → Critic → Gatekeeper → Implementer → PR Writer
+  - Need one coordinator skill to run Scout → Analyst/Architect → Critic → Gatekeeper → Implementer → Reviewer → PR Writer
   - Want stage-by-stage handoff with explicit quality gates between stages
   - Need quick-win or architecture-focused variants of the same pipeline
 license: MIT
@@ -28,17 +28,19 @@ Coordinate the PR Factory sequence and hand off outputs between stages.
 ## Mode Selection
 
 - `full` (default):
-  - `scout -> analyst -> critic -> gatekeeper -> implementer -> pr-writer -> (publisher if requested)`
+  - `scout -> analyst -> critic -> gatekeeper -> implementer -> reviewer -> pr-writer -> (publisher if requested)`
 - `quick-win`:
-  - `scout -> gatekeeper -> implementer -> pr-writer -> (publisher if requested)`
+  - `scout -> gatekeeper -> implementer -> reviewer -> pr-writer -> (publisher if requested)`
 - `architecture`:
-  - `architect -> critic -> gatekeeper -> implementer -> pr-writer -> (publisher if requested)`
+  - `architect -> critic -> gatekeeper -> implementer -> reviewer -> pr-writer -> (publisher if requested)`
 
 Detailed per-stage contracts: `references/stage-contracts.md`.
 
 ## Process
 
 1. Normalize inputs and select mode.
+   - For automation, prefer deterministic code orchestration via `../../tools/run_pipeline.py`.
+   - Use this skill prompt as "chat mode" policy/control-plane guidance.
 2. If `CONTEXT_PATH` is provided:
    - read only relevant files (prefer `.md` summaries),
    - extract constraints/policies/risk notes,
@@ -49,6 +51,7 @@ Detailed per-stage contracts: `references/stage-contracts.md`.
    - Critic decision must be `approve`.
    - Gatekeeper decision must be `pr`.
    - Implementer status must be `success`.
+   - Reviewer status must be `success`.
 6. Stop early on gate failure and return `needs_human` with reason.
 7. On success, return final payload from PR Writer plus stage summary.
 

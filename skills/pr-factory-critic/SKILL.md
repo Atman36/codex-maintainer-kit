@@ -150,6 +150,7 @@ Return **JSON only** (без Markdown и пояснений вокруг):
 
 ### revise
 Хорошая идея, но нужно доработать scope/approach/plan.
+`must_fix_before_implement` должен быть непустым и конкретным (чек-лист действий).
 **Next step:** Analyst (с указаниями из must_fix_before_implement)
 
 ### reject
@@ -163,6 +164,7 @@ Return **JSON only** (без Markdown и пояснений вокруг):
 - **Предлагай split-план**: Если scope можно разделить
 - **Проверяй assumptions**: Что ты предполагаешь? Нужно ли это проверить?
 - **Думай как maintainer**: Принял бы я это в свой проект?
+- Если `decision=revise`, всегда заполняй `must_fix_before_implement` (минимум 1 пункт)
 
 ## Output Examples
 

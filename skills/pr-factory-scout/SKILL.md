@@ -31,6 +31,7 @@ Quickly decide whether this repo is a good target **right now**, and list 3–7 
 
 1. **Read documentation**: README, CONTRIBUTING, CODE_OF_CONDUCT, LICENSE
 2. **Identify tooling**: How to run tests, lint, build (if present)
+   - Also map detected config paths (`eslint`, `prettier`, `pytest.ini`, `tox.ini`, `tsconfig`, CI workflows, etc.)
 3. **Check repo signals**: CI config exists? tests folder? recent commits? (local analysis only, don't browse web)
 4. **Generate candidates**: 3-7 low-risk improvements with title, type, estimated LOC, likely files, risk, verification plan
 
@@ -76,6 +77,12 @@ Return JSON conforming to `../../schemas/execution_result.schema.json`:
         "lint": "npm run lint",
         "build": "npm run build"
       },
+      "config_paths": {
+        "test": ["pytest.ini"],
+        "lint": [".eslintrc.json"],
+        "build": ["package.json"],
+        "ci": [".github/workflows/ci.yml"]
+      },
       "constraints_from_contributing": [
         "Run tests before submitting PR",
         "Follow conventional commits format"
@@ -114,3 +121,4 @@ Return JSON conforming to `../../schemas/execution_result.schema.json`:
 - Prioritize **low-risk, high-value** changes
 - Verify commands work in the actual repo before suggesting them
 - Never invent project requirements - use what's already there
+- Always include discovered config files under `data.repo_profile.config_paths`

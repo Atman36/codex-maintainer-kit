@@ -1,7 +1,7 @@
 # PR Factory Kit (prompts + contracts + quality gate)
 
 This kit is designed for a multi-agent PR pipeline:
-Scout → Analyst → Gatekeeper → Implementer → PR Writer → Publisher.
+Scout → Analyst → Critic → Gatekeeper → Implementer → Reviewer → PR Writer → Publisher.
 
 ## What’s inside
 
@@ -9,7 +9,8 @@ Scout → Analyst → Gatekeeper → Implementer → PR Writer → Publisher.
 - `schemas/` — strict JSON Schemas:
   - `PRSpec` — what we intend to ship as a PR.
   - `ExecutionResult` — uniform result envelope for *any* CLI/agent run.
-- `tools/quality_gate.py` — forbidden-files scanner + merge-probability heuristic.
+- `tools/quality_gate.py` — forbidden-files scanner + merge-probability heuristic + files_touched enforcement.
+- `tools/run_pipeline.py` — deterministic DAG orchestrator (stage order + gate checks + implement retries).
 - `tools/README.md` — how to run the gate locally / in CI.
 
 ## Placeholders

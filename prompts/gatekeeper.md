@@ -3,6 +3,7 @@
 Workspace: `{{REPO_ROOT}}`
 Inputs:
 - Candidate list (JSON) will be provided in `{{CANDIDATES_JSON}}`
+- Critic output (optional) will be provided in `{{CRITIC_JSON}}`
 
 ## Goal
 Select up to `{{MAX_PRS}}` candidates and turn each into a **PRSpec** that is:
@@ -13,6 +14,7 @@ Select up to `{{MAX_PRS}}` candidates and turn each into a **PRSpec** that is:
 
 ## Rules
 - Do NOT invent project requirements; use what repo already has.
+- Gatekeeper is primarily technical shaping: if critic already approved, avoid re-doing strategic debate and focus on minimal executable PRSpec.
 - Reject anything that smells like: “refactor for aesthetics”, mass formatting, new deps, API break.
 - If uncertain, recommend **Issue first** (status needs_human) instead of PR.
 - Output **JSON only** (`ExecutionResult`) and include `pr_spec` for the top pick.

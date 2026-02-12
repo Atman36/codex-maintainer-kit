@@ -17,6 +17,7 @@ Quickly decide whether this repo is a good target *right now*, and list 3–7 **
 ## What to do (fast)
 1) Read: README, CONTRIBUTING, CODE_OF_CONDUCT, LICENSE.
 2) Identify how to run: tests, lint, build (if present).
+   - Capture config file paths for each area (test/lint/build/ci) when available.
 3) Check repo signals (local only): CI config exists? tests folder? recent commits? (don’t browse web).
 4) Produce candidates with:
    - title, type, estimated LOC, likely files, risk, how to verify.
@@ -25,7 +26,7 @@ Quickly decide whether this repo is a good target *right now*, and list 3–7 **
 Return an `ExecutionResult` with:
 - stage = `scout`
 - status = success / skipped
-- data.repo_profile: {stack_hints, ci_detected, commands:{test,lint,build}, constraints_from_contributing}
+- data.repo_profile: {stack_hints, ci_detected, commands:{test,lint,build}, config_paths:{test[],lint[],build[],ci[]}, constraints_from_contributing}
 - data.candidates: array of 3–7 items:
   {id, title, change_type, risk, est_loc, likely_paths[], rationale, test_plan[]}
 - data.repo_score: {score_0_10, reasons[], blockers[]}

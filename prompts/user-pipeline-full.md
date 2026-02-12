@@ -15,6 +15,7 @@
 1) Наиболее вероятные к merge улучшения (список кандидатов).
 2) Итоговый PRSpec (готовый к публикации).
 3) Итоговый PR message (title + body_markdown).
+4) Post-implementation reviewer verdict (pass/fix_required/human_required).
 
 Ограничения:
 - Публиковать PR (форк/пуш/gh pr create) **НЕ нужно**, если я отдельно это не попросил.
@@ -25,4 +26,3 @@
 - `stage` = `pipeline`.
 - В `pr_spec` положи финальный PRSpec.
 - В `data` включи: `pipeline_mode`, `stage_summary[]`, `top_improvements[]`, `selected_prspec`, `final_pr_message`.
-

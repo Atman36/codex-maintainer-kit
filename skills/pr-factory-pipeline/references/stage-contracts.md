@@ -10,7 +10,7 @@ Use this file to keep stage handoffs deterministic.
 
 2. `pr-factory-analyst`
 - Input: `REPO_ROOT`, optional `FOCUS`
-- Output: refined candidates JSON
+- Output: refined candidates JSON + `related_files` hints for Implementer context scope
 
 3. `pr-factory-critic`
 - Input: proposed changes/candidates + optional policy constraints
@@ -24,23 +24,27 @@ Use this file to keep stage handoffs deterministic.
 - Input: approved PRSpec + `HEAD_BRANCH`
 - Gate: `status == success`
 
-6. `pr-factory-pr-writer`
-- Input: implementer output (+ optional diff summary)
+6. `pr-factory-reviewer`
+- Input: implementer output + git diff summary
+- Gate: `status == success`
+
+7. `pr-factory-pr-writer`
+- Input: reviewer + implementer outputs (+ optional diff summary)
 - Output: final PR message and complete PRSpec
 
-7. `pr-factory-publisher` (optional; only if user asked to publish)
+8. `pr-factory-publisher` (optional; only if user asked to publish)
 - Input: final PRSpec + `HEAD_BRANCH`
 - Output: publish JSON (`ExecutionResult`) with PR URL (or `skipped` / `needs_human`)
 
 ## Quick-Win Mode
 
-`scout -> gatekeeper -> implementer -> pr-writer -> (publisher if requested)`
+`scout -> gatekeeper -> implementer -> reviewer -> pr-writer -> (publisher if requested)`
 
 Use when obvious low-risk change is enough.
 
 ## Architecture Mode
 
-`architect -> critic -> gatekeeper -> implementer -> pr-writer -> (publisher if requested)`
+`architect -> critic -> gatekeeper -> implementer -> reviewer -> pr-writer -> (publisher if requested)`
 
 Use when goal is targeted structural improvement (<200 LOC).
 
@@ -50,4 +54,5 @@ Use when goal is targeted structural improvement (<200 LOC).
 - Critic returns `reject` or `revise`.
 - Gatekeeper returns `issue` or `skip`.
 - Implementer returns `failed` or `needs_human`.
+- Reviewer returns `failed` or `needs_human`.
 - Publisher returns `failed` or `needs_human` (if publishing was requested).

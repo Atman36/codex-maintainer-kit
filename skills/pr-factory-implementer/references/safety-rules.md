@@ -70,6 +70,8 @@ git status --short
 - Don't refactor unrelated code
 - Don't fix nearby bugs unless PRSpec says so
 - Don't format unrelated files
+- If out-of-scope files changed, revert immediately with:
+  `git checkout -- <file1> <file2> ...`
 
 **Track what you change:**
 ```bash
@@ -212,6 +214,15 @@ git add pnpm-lock.yaml
 ```
 
 ## Error Recovery
+
+### Self-Healing Loop (max 3 attempts)
+
+Use deterministic loop:
+1. Implement
+2. Verify
+3. If failed, parse stderr and apply minimal fix
+4. Verify again
+5. Stop after 3 attempts and return `retryable`/`needs_human`
 
 ### Test Failures
 
@@ -495,7 +506,7 @@ git diff src/utils/validation.test.ts
 ```
 
 **Fix:**
-1. Undo changes: `git checkout src/utils/validation.test.ts`
+1. Undo changes: `git checkout -- src/utils/validation.test.ts`
 2. Disable auto-format for this session
 3. Implement only the test addition
 4. Match existing file style
@@ -513,7 +524,8 @@ A  .agentplane/state.db
 
 **Fix:**
 ```bash
-git reset HEAD .claude/ .agentplane/
+git checkout -- .claude/ .agentplane/
+git clean -fd -- .claude/ .agentplane/
 echo '.claude/' >> .gitignore
 echo '.agentplane/' >> .gitignore
 git add .gitignore
