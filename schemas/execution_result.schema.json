@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/prfactory/ExecutionResult.schema.json",
+  "title": "ExecutionResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "stage",
+    "status",
+    "summary",
+    "started_at",
+    "finished_at",
+    "exit_code",
+    "artifacts",
+    "metrics",
+    "errors",
+    "warnings",
+    "data"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "type": "string",
+      "enum": [
+        "scout",
+        "analysis",
+        "gatekeeper",
+        "implement",
+        "pr_writer",
+        "publish",
+        "other"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "success",
+        "failed",
+        "retryable",
+        "needs_human",
+        "skipped"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 400
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "finished_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "exit_code": {
+      "type": "integer"
+    },
+    "stdout": {
+      "type": "string"
+    },
+    "stderr": {
+      "type": "string"
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "path"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "minLength": 1
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{64}$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "content_type": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "duration_ms",
+        "cost_usd",
+        "tokens_in",
+        "tokens_out"
+      ],
+      "properties": {
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cost_usd": {
+          "type": "number",
+          "minimum": 0.0
+        },
+        "tokens_in": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tokens_out": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "model": {
+          "type": "string"
+        },
+        "cli": {
+          "type": "string"
+        },
+        "retries": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Role-specific payload. Keep it JSON-serializable."
+    },
+    "pr_spec": {
+      "description": "Optional PRSpec produced by Gatekeeper/PR Writer.",
+      "$ref": "./prspec.schema.json"
+    }
+  }
+}

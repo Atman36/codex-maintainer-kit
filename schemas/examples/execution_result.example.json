@@ -1,0 +1,47 @@
+{
+  "schema_version": "1.0",
+  "id": "job-2026-02-12T12:00Z-repoX",
+  "stage": "implement",
+  "status": "success",
+  "summary": "Implemented docs fix + minimal example; tests pass.",
+  "started_at": "2026-02-12T12:00:00+00:00",
+  "finished_at": "2026-02-12T12:00:00+00:00",
+  "exit_code": 0,
+  "stdout": "(truncated)",
+  "stderr": "",
+  "artifacts": [
+    {
+      "kind": "patch",
+      "path": "artifacts/repoX-docs-fix.patch"
+    },
+    {
+      "kind": "test_log",
+      "path": "artifacts/tests.log"
+    }
+  ],
+  "metrics": {
+    "duration_ms": 182000,
+    "cost_usd": 0.84,
+    "tokens_in": 12000,
+    "tokens_out": 4300,
+    "model": "gpt-5",
+    "cli": "codex",
+    "retries": 0
+  },
+  "errors": [],
+  "warnings": [
+    "README command assumes bash; consider adding PowerShell variant later."
+  ],
+  "data": {
+    "changed_files": [
+      "README.md",
+      "examples/minimal.py"
+    ],
+    "tests": {
+      "ok": true,
+      "commands": [
+        "pytest -q"
+      ]
+    }
+  }
+}

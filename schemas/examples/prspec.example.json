@@ -1,0 +1,72 @@
+{
+  "schema_version": "1.0",
+  "id": "repoX-docs-fix-cli-example",
+  "repo": {
+    "url": "https://github.com/org/repoX",
+    "owner": "org",
+    "name": "repoX",
+    "default_branch": "main"
+  },
+  "base": {
+    "branch": "main",
+    "sha": "abc1234"
+  },
+  "head": {
+    "branch": "ai/docs-fix-cli-example",
+    "sha": "def5678"
+  },
+  "title": "docs: fix quickstart command and add minimal example",
+  "body_markdown": "## What\nFixes a broken quickstart command and adds a minimal runnable example.\n\n## Why\nNew users can copy/paste the README without hitting an error.\n\n## How tested\n- `pytest -q`\n\n## Notes\nNo API changes.",
+  "change_type": "docs",
+  "risk": "low",
+  "breaking_change": false,
+  "files_touched": [
+    "README.md",
+    "examples/minimal.py"
+  ],
+  "commands_run": [
+    "pytest -q"
+  ],
+  "test_plan": [
+    "pytest -q"
+  ],
+  "checklist": [
+    "[x] Small, focused change",
+    "[x] Tests pass locally",
+    "[x] No new dependencies"
+  ],
+  "labels": [
+    "documentation"
+  ],
+  "issues": [
+    "#123"
+  ],
+  "maintainer_notes": "If you prefer, I can split the example into a separate PR.",
+  "ai_assistance": {
+    "used": true,
+    "tools": [
+      {
+        "name": "codex-cli",
+        "role": "implementer",
+        "model": "gpt-5",
+        "version": "0.12.3"
+      },
+      {
+        "name": "claude-code",
+        "role": "gatekeeper",
+        "model": "claude-sonnet",
+        "version": "1.9.0"
+      }
+    ],
+    "disclosure_line": "AI-assisted (codex-cli + claude-code). Changes were reviewed and tested locally."
+  },
+  "merge_assessment": {
+    "probability": 0.78,
+    "reasons": [
+      "Docs-only change",
+      "Small diff",
+      "Commands verified"
+    ],
+    "blockers": []
+  }
+}
