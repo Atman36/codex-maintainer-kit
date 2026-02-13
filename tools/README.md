@@ -326,6 +326,150 @@ python tools/run_pipeline.py \
 
 ---
 
+## `fetch_pr_comments.py`
+
+Fetch PR comments from GitHub for analysis and research.
+
+### What it does
+
+- Downloads **issue comments** (general PR discussion)
+- Downloads **review comments** (line-specific code review)
+- Supports both GitHub CLI (`gh`) and PyGithub
+- Uses parallel per-PR requests (configurable worker pool) for faster fetch on larger repos
+- Retries transient API/rate-limit errors with exponential backoff
+- Exports to JSON or CSV format
+- Supports filtering by author and date
+
+### Requirements
+
+```bash
+# Option 1: GitHub CLI (preferred - faster with pagination)
+gh auth login
+
+# Option 2: PyGithub (Python library)
+pip install PyGithub
+export GITHUB_TOKEN=your_token_here
+```
+
+### Usage Examples
+
+#### Fetch all comments (JSON)
+
+```bash
+python tools/fetch_pr_comments.py \
+  owner/repo \
+  --output pr_comments.json
+```
+
+#### Fetch only review comments (CSV for Excel)
+
+```bash
+python tools/fetch_pr_comments.py \
+  owner/repo \
+  --type review \
+  --format csv \
+  --output code_reviews.csv
+```
+
+#### Filter by authors
+
+```bash
+python tools/fetch_pr_comments.py \
+  owner/repo \
+  --authors "maintainer1,maintainer2" \
+  --output maintainer_comments.json
+```
+
+#### Filter by date
+
+```bash
+python tools/fetch_pr_comments.py \
+  owner/repo \
+  --since 2024-01-01 \
+  --output recent_comments.json
+```
+
+#### Speed up large repos with parallel workers
+
+```bash
+python tools/fetch_pr_comments.py \
+  owner/repo \
+  --max-prs 200 \
+  --workers 16 \
+  --output fast_comments.json
+```
+
+#### Strict mode (fail if any PR request fails)
+
+```bash
+python tools/fetch_pr_comments.py \
+  owner/repo \
+  --max-prs 100 \
+  --strict-errors \
+  --output strict_comments.json
+```
+
+#### Incremental sync with resume state
+
+```bash
+python tools/fetch_pr_comments.py \
+  owner/repo \
+  --state-file artifacts/pr_comments_state.json \
+  --output incremental_comments.json
+```
+
+If `--since` is not provided, the script uses the timestamp from `--state-file`.
+
+#### Use PyGithub (if gh CLI not available)
+
+```bash
+python tools/fetch_pr_comments.py \
+  owner/repo \
+  --prefer-pygithub \
+  --token $GITHUB_TOKEN \
+  --output comments.json
+```
+
+### Output Formats
+
+**JSON** (recommended for further processing):
+```json
+{
+  "meta": {
+    "exported_at": "2026-02-13T...",
+    "total_comments": 1250,
+    "by_type": {
+      "issue_comment": 800,
+      "review_comment": 450
+    }
+  },
+  "comments": [...]
+}
+```
+
+**CSV** (for Excel/spreadsheet analysis):
+```
+pr_number,pr_title,comment_id,author,body,created_at,...
+123,Fix bug,987654321,reviewer,"Looks good!",2024-01-15T10:30:00Z,...
+```
+
+### Comment Types
+
+| Type | API Endpoint | Content |
+|------|--------------|---------|
+| `issue_comment` | `/issues/{number}/comments` | General PR discussion, questions, approvals |
+| `review_comment` | `/pulls/{number}/comments` | Line-specific feedback on code changes |
+
+### Rate Limits
+
+- GitHub CLI: Uses your normal API quota (5000 req/hour for authenticated users)
+- PyGithub: Same 5000 req/hour limit
+- Use `--since` to reduce API load for incremental runs
+- Use `--workers` carefully (higher values are faster but increase request burst rate)
+- Use `--state-file` to resume from last successful sync automatically
+
+---
+
 ## License
 
 MIT - See LICENSE file in repository root.
