@@ -1,0 +1,44 @@
+{
+  "name": "pr-factory-reviewer",
+  "version": "1.0.0",
+  "description": "Post-implementation reviewer that checks git diff quality before PR writing",
+  "type": "gate",
+  "stage": 5,
+  "license": "MIT",
+  "inputs": [
+    {
+      "name": "REPO_ROOT",
+      "type": "string",
+      "required": true,
+      "description": "Workspace path"
+    },
+    {
+      "name": "PRSPEC_JSON",
+      "type": "object",
+      "required": true,
+      "description": "Approved PRSpec (scope contract)"
+    },
+    {
+      "name": "IMPLEMENT_RESULT_JSON",
+      "type": "object",
+      "required": true,
+      "description": "Implementer output JSON"
+    },
+    {
+      "name": "DIFF_SUMMARY",
+      "type": "string",
+      "required": false,
+      "description": "Optional diff summary (git diff --name-status, git diff --stat)"
+    }
+  ],
+  "outputs": ["ExecutionResult"],
+  "decisions": ["pass", "retryable", "needs_human"],
+  "next_stages": {
+    "pass": "pr-writer",
+    "retryable": "implementer",
+    "needs_human": null
+  },
+  "schema_paths": {
+    "execution_result": "../../schemas/execution_result.schema.json"
+  }
+}

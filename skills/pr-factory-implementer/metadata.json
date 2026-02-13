@@ -1,0 +1,55 @@
+{
+  "name": "pr-factory-implementer",
+  "version": "1.0.0",
+  "description": "Safely implement PRSpec changes in a clean worktree with minimal diff",
+  "type": "agent",
+  "stage": 4,
+  "license": "MIT",
+  "inputs": [
+    {
+      "name": "REPO_ROOT",
+      "type": "string",
+      "required": true,
+      "description": "Workspace path"
+    },
+    {
+      "name": "HEAD_BRANCH",
+      "type": "string",
+      "required": true,
+      "description": "Head branch (already checked out)"
+    },
+    {
+      "name": "PRSPEC_JSON",
+      "type": "object",
+      "required": true,
+      "description": "PRSpec JSON (approved by Gatekeeper)"
+    },
+    {
+      "name": "RELATED_FILES",
+      "type": "array",
+      "required": false,
+      "description": "Optional high-signal file list from Analyst/Scout"
+    },
+    {
+      "name": "CONSTRAINTS",
+      "type": "array",
+      "required": false,
+      "description": "Additional constraints (optional)"
+    },
+    {
+      "name": "ALLOWED_COMMANDS",
+      "type": "array",
+      "required": false,
+      "description": "Allowed verification commands (optional)"
+    }
+  ],
+  "outputs": ["ExecutionResult"],
+  "next_stages": ["reviewer"],
+  "retry_policy": {
+    "max_attempts": 3,
+    "on_failure": "self-heal"
+  },
+  "schema_paths": {
+    "execution_result": "../../schemas/execution_result.schema.json"
+  }
+}

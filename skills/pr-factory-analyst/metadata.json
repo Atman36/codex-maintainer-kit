@@ -1,0 +1,35 @@
+{
+  "name": "pr-factory-analyst",
+  "version": "1.0.0",
+  "description": "Deep analysis to find 5 concrete, high-quality PR candidates in a specific focus area",
+  "type": "agent",
+  "stage": 2,
+  "license": "MIT",
+  "inputs": [
+    {
+      "name": "REPO_ROOT",
+      "type": "string",
+      "required": true,
+      "description": "Workspace path"
+    },
+    {
+      "name": "FOCUS",
+      "type": "string",
+      "required": false,
+      "enum": ["docs", "tests", "bugfix", "perf", "refactor", "ci", "dx", "auto"],
+      "default": "auto",
+      "description": "Analysis focus area"
+    },
+    {
+      "name": "SCOUT_JSON",
+      "type": "object",
+      "required": false,
+      "description": "Optional Scout output for dynamic focus and config reuse"
+    }
+  ],
+  "outputs": ["ExecutionResult"],
+  "next_stages": ["critic", "gatekeeper"],
+  "schema_paths": {
+    "execution_result": "../../schemas/execution_result.schema.json"
+  }
+}

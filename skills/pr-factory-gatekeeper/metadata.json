@@ -1,0 +1,46 @@
+{
+  "name": "pr-factory-gatekeeper",
+  "version": "1.0.0",
+  "description": "Select best PR candidates and shape them into minimal, mergeable PRSpecs",
+  "type": "agent",
+  "stage": 3,
+  "license": "MIT",
+  "inputs": [
+    {
+      "name": "REPO_ROOT",
+      "type": "string",
+      "required": true,
+      "description": "Workspace path"
+    },
+    {
+      "name": "CANDIDATES_JSON",
+      "type": "object",
+      "required": true,
+      "description": "Candidate list JSON (from Scout or Analyst)"
+    },
+    {
+      "name": "CRITIC_JSON",
+      "type": "object",
+      "required": false,
+      "description": "Optional critic decision JSON (if present, use as hard constraints)"
+    },
+    {
+      "name": "MAX_PRS",
+      "type": "integer",
+      "required": false,
+      "default": 1,
+      "description": "Maximum number of PRs to select"
+    }
+  ],
+  "outputs": ["ExecutionResult"],
+  "decisions": ["pr", "issue", "skip"],
+  "next_stages": {
+    "pr": "implementer",
+    "issue": null,
+    "skip": null
+  },
+  "schema_paths": {
+    "execution_result": "../../schemas/execution_result.schema.json",
+    "prspec": "../../schemas/prspec.schema.json"
+  }
+}

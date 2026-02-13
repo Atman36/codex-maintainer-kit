@@ -1,0 +1,34 @@
+{
+  "name": "pr-factory-pr-writer",
+  "version": "1.0.0",
+  "description": "Write excellent, concise PR messages that maintainers can merge quickly",
+  "type": "agent",
+  "stage": 6,
+  "license": "MIT",
+  "inputs": [
+    {
+      "name": "REPO_ROOT",
+      "type": "string",
+      "required": true,
+      "description": "Workspace path"
+    },
+    {
+      "name": "IMPLEMENT_RESULT_JSON",
+      "type": "object",
+      "required": true,
+      "description": "Implementation result JSON (from Implementer)"
+    },
+    {
+      "name": "DIFF_SUMMARY",
+      "type": "string",
+      "required": false,
+      "description": "Git diff summary (optional, will be generated if not provided)"
+    }
+  ],
+  "outputs": ["ExecutionResult"],
+  "next_stages": ["publisher"],
+  "schema_paths": {
+    "execution_result": "../../schemas/execution_result.schema.json",
+    "prspec": "../../schemas/prspec.schema.json"
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "name": "pr-factory-pipeline",
+  "version": "1.0.0",
+  "description": "Orchestrate PR Factory skills as one ordered pipeline for end-to-end PR preparation",
+  "type": "orchestrator",
+  "stage": "pipeline",
+  "license": "MIT",
+  "inputs": [
+    {
+      "name": "REPO_ROOT",
+      "type": "string",
+      "required": true,
+      "description": "Absolute path to target repository"
+    },
+    {
+      "name": "REPO_URL",
+      "type": "string",
+      "required": false,
+      "description": "Repository URL"
+    },
+    {
+      "name": "BASE_BRANCH",
+      "type": "string",
+      "required": false,
+      "default": "main",
+      "description": "Base branch for PR"
+    },
+    {
+      "name": "CONTEXT_PATH",
+      "type": "string",
+      "required": false,
+      "description": "Optional path to external context (deepresearch/ directory or .md file)"
+    },
+    {
+      "name": "FOCUS",
+      "type": "string",
+      "required": false,
+      "enum": ["docs", "tests", "bugfix", "perf", "refactor", "ci", "dx"],
+      "description": "Optional focus area"
+    },
+    {
+      "name": "MODE",
+      "type": "string",
+      "required": false,
+      "default": "full",
+      "enum": ["full", "quick-win", "architecture"],
+      "description": "Pipeline execution mode"
+    },
+    {
+      "name": "MAX_PRS",
+      "type": "integer",
+      "required": false,
+      "default": 1,
+      "description": "Maximum number of PRs to generate"
+    }
+  ],
+  "outputs": ["ExecutionResult"],
+  "stages": {
+    "full": ["scout", "analyst", "critic", "gatekeeper", "implementer", "reviewer", "pr-writer"],
+    "quick-win": ["scout", "gatekeeper", "implementer", "reviewer", "pr-writer"],
+    "architecture": ["architect", "critic", "gatekeeper", "implementer", "reviewer", "pr-writer"]
+  },
+  "schema_paths": {
+    "execution_result": "../../schemas/execution_result.schema.json",
+    "prspec": "../../schemas/prspec.schema.json"
+  }
+}

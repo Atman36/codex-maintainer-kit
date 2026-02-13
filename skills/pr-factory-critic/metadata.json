@@ -1,0 +1,61 @@
+{
+  "name": "pr-factory-critic",
+  "version": "1.0.0",
+  "description": "Pre-implementation quality gate for evaluating proposed changes",
+  "type": "gate",
+  "stage": "gate",
+  "license": "MIT",
+  "inputs": [
+    {
+      "name": "REPO_URL",
+      "type": "string",
+      "required": false,
+      "description": "Repository URL"
+    },
+    {
+      "name": "BASE_BRANCH",
+      "type": "string",
+      "required": false,
+      "description": "Base branch"
+    },
+    {
+      "name": "POLICY_BRIEF",
+      "type": "string",
+      "required": false,
+      "description": "Policy brief (optional)"
+    },
+    {
+      "name": "PROPOSED_CHANGES",
+      "type": "array",
+      "required": true,
+      "description": "Proposed changes (list of ideas/PRSpec/plan)"
+    },
+    {
+      "name": "TIME_BUDGET",
+      "type": "string",
+      "required": false,
+      "description": "Time budget constraint (optional)"
+    },
+    {
+      "name": "RISK_BUDGET",
+      "type": "string",
+      "required": false,
+      "enum": ["low", "medium", "high"],
+      "description": "Risk budget constraint (optional)"
+    },
+    {
+      "name": "ALLOWED_FILES_HINT",
+      "type": "array",
+      "required": false,
+      "description": "Hint for allowed files (optional)"
+    }
+  ],
+  "outputs": ["CriticDecision"],
+  "decisions": ["approve", "revise", "reject"],
+  "next_stages": {
+    "approve": "gatekeeper",
+    "revise": "analyst",
+    "reject": null
+  },
+  "note": "Critic outputs a simplified JSON format (not ExecutionResult) with decision and evaluation details"
+}

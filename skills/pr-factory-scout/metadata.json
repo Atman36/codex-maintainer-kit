@@ -1,0 +1,34 @@
+{
+  "name": "pr-factory-scout",
+  "version": "1.0.0",
+  "description": "Quick repository triage and discovery of 3-7 low-risk improvement candidates",
+  "type": "agent",
+  "stage": 1,
+  "license": "MIT",
+  "inputs": [
+    {
+      "name": "REPO_ROOT",
+      "type": "string",
+      "required": true,
+      "description": "Local repository path"
+    },
+    {
+      "name": "REPO_URL",
+      "type": "string",
+      "required": false,
+      "description": "Repository URL"
+    },
+    {
+      "name": "BASE_BRANCH",
+      "type": "string",
+      "required": false,
+      "default": "main",
+      "description": "Target branch"
+    }
+  ],
+  "outputs": ["ExecutionResult"],
+  "next_stages": ["analyst", "critic", "gatekeeper", "architect"],
+  "schema_paths": {
+    "execution_result": "../../schemas/execution_result.schema.json"
+  }
+}

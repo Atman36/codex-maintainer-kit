@@ -1,0 +1,25 @@
+{
+  "name": "pr-factory-architect",
+  "version": "1.0.0",
+  "description": "Find small architectural improvements (<200 LOC) as alternative analysis entry",
+  "type": "agent",
+  "stage": 2,
+  "license": "MIT",
+  "inputs": [
+    {
+      "name": "REPO_ROOT",
+      "type": "string",
+      "required": true,
+      "description": "Workspace path"
+    }
+  ],
+  "outputs": ["ExecutionResult"],
+  "next_stages": ["critic", "gatekeeper"],
+  "scope_limit": {
+    "max_loc": 200,
+    "focus": "refactoring"
+  },
+  "schema_paths": {
+    "execution_result": "../../schemas/execution_result.schema.json"
+  }
+}

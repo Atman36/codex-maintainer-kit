@@ -1,0 +1,45 @@
+{
+  "name": "pr-factory-publisher",
+  "version": "1.0.0",
+  "description": "Publish the change as a PR (fork/push/open PR) only when user explicitly requests",
+  "type": "agent",
+  "stage": 7,
+  "license": "MIT",
+  "inputs": [
+    {
+      "name": "REPO_ROOT",
+      "type": "string",
+      "required": true,
+      "description": "Local repository path"
+    },
+    {
+      "name": "REPO_URL",
+      "type": "string",
+      "required": true,
+      "description": "Upstream repository URL"
+    },
+    {
+      "name": "BASE_BRANCH",
+      "type": "string",
+      "required": true,
+      "description": "Base branch"
+    },
+    {
+      "name": "HEAD_BRANCH",
+      "type": "string",
+      "required": true,
+      "description": "Head branch (already committed)"
+    },
+    {
+      "name": "PRSPEC_JSON",
+      "type": "object",
+      "required": true,
+      "description": "Final PRSpec JSON (title/body)"
+    }
+  ],
+  "outputs": ["ExecutionResult"],
+  "requirements": ["gh CLI installed and authenticated"],
+  "schema_paths": {
+    "execution_result": "../../schemas/execution_result.schema.json"
+  }
+}

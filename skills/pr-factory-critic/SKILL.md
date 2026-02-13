@@ -95,6 +95,8 @@ PR будет читабельным?
 
 ## Output Format
 
+> **Note:** Critic uses a simplified JSON format (not `ExecutionResult`) because it acts as a decision gate, not a full execution stage. This format focuses on the decision and evaluation criteria rather than execution metrics.
+
 Return **JSON only** (без Markdown и пояснений вокруг):
 
 ```json
