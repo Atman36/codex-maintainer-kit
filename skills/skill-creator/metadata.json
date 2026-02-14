@@ -1,0 +1,16 @@
+{
+  "name": "skill-creator",
+  "version": "1.0.0",
+  "description": "Guide for creating or updating Codex skills with clear triggers, concise instructions, and reusable resources.",
+  "type": "guide",
+  "license": "Complete terms in LICENSE.txt",
+  "inputs": [
+    {
+      "name": "SKILL_REQUEST",
+      "type": "string",
+      "required": true,
+      "description": "Requested new skill or update scope"
+    }
+  ],
+  "outputs": ["SkillPackage"]
+}

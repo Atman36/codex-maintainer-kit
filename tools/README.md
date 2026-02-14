@@ -103,6 +103,37 @@ With `--json` flag, outputs structured result:
 
 ---
 
+## `validate_skills.py`
+
+Validates integrity of local skill packages in `skills/`.
+
+### What it checks
+
+1. `SKILL.md` exists for each skill
+2. `SKILL.md` includes frontmatter with required keys (`name`, `description`)
+3. `metadata.json` exists, is valid JSON, and includes `version`
+
+### Usage
+
+```bash
+python tools/validate_skills.py
+```
+
+Optional root override:
+
+```bash
+python tools/validate_skills.py --root /path/to/repo
+```
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | Validation passed |
+| `1` | Validation failed |
+
+---
+
 ## `run_pipeline.py`
 
 Deterministic orchestrator for staged PR Factory execution.

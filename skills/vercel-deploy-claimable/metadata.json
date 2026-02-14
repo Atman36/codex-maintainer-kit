@@ -1,0 +1,17 @@
+{
+  "name": "vercel-deploy",
+  "version": "1.0.0",
+  "description": "Deploy a project to Vercel using a claimable deployment flow and return preview and claim URLs.",
+  "type": "utility",
+  "license": "MIT",
+  "inputs": [
+    {
+      "name": "path",
+      "type": "string",
+      "required": false,
+      "default": ".",
+      "description": "Path to a project directory or .tgz archive"
+    }
+  ],
+  "outputs": ["DeploymentResult"]
+}
