@@ -5,3 +5,7 @@ artifacts/
 .claude/
 merge_markdown.py
 analysis_report/
+
+# Python bytecode
+__pycache__/
+*.pyc

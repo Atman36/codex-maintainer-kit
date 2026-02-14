@@ -208,26 +208,40 @@ Repository → Scout → Critic → Gatekeeper → Implementer → Reviewer → 
 3. Cut scope if needed
 4. Provide detailed reasoning
 
-**Output:** JSON (not ExecutionResult) with:
+**Output:** `ExecutionResult` with Critic details under `data.*`:
 ```json
 {
-  "decision": "approve",
-  "top_reasons": [...],
-  "must_fix_before_implement": [],
-  "scope_cut": {
-    "keep": [...],
-    "drop": [...],
-    "split_into_separate_prs": [...]
-  },
-  "acceptance_criteria": [...],
-  "test_plan": [...],
-  "reviewer_notes": "...",
-  "merge_probability": {
-    "estimate": 0.9,
-    "drivers_positive": [...],
-    "drivers_negative": [...]
-  },
-  "go_no_go_next_step": "approve → Implementer"
+  "schema_version": "1.0",
+  "id": "critic-<timestamp>",
+  "stage": "critic",
+  "status": "success",
+  "summary": "Critic decision: approve",
+  "started_at": "<iso8601>",
+  "finished_at": "<iso8601>",
+  "exit_code": 0,
+  "artifacts": [],
+  "metrics": { "duration_ms": 0, "cost_usd": 0.0, "tokens_in": 0, "tokens_out": 0 },
+  "errors": [],
+  "warnings": [],
+  "data": {
+    "decision": "approve",
+    "top_reasons": [...],
+    "must_fix_before_implement": [],
+    "scope_cut": {
+      "keep": [...],
+      "drop": [...],
+      "split_into_separate_prs": [...]
+    },
+    "acceptance_criteria": [...],
+    "test_plan": [...],
+    "reviewer_notes": "...",
+    "merge_probability": {
+      "estimate": 0.9,
+      "drivers_positive": [...],
+      "drivers_negative": [...]
+    },
+    "go_no_go_next_step": "approve → Implementer"
+  }
 }
 ```
 

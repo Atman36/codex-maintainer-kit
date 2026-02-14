@@ -96,53 +96,74 @@ Detailed criteria and examples in [references/evaluation-criteria.md](references
 
 ## Output Format
 
-> **Note:** Critic uses a simplified JSON format (not `ExecutionResult`) because it acts as a decision gate, not a full execution stage. This format focuses on the decision and evaluation criteria rather than execution metrics.
-> Build this JSON payload, save it to `analysis_report`, and do not print the raw JSON in chat.
+1. Build JSON payload conforming to `../../schemas/execution_result.schema.json`.
 
-1. Build critic JSON payload:
+- Use `stage="critic"`.
+- Put Critic-specific fields under `data.*` (same semantics as before).
 
 ```json
 {
-  "decision": "approve",
-  "top_reasons": [
-    "Fixes reported bug #123",
-    "Minimal scope (1 file, 5 LOC)",
-    "Low risk (null check only)",
-    "Clear test plan"
-  ],
-  "must_fix_before_implement": [],
-  "scope_cut": {
-    "keep": [
-      "Add null check in parseURL"
-    ],
-    "drop": [],
-    "split_into_separate_prs": []
+  "schema_version": "1.0",
+  "id": "critic-<timestamp>",
+  "stage": "critic",
+  "status": "success",
+  "summary": "Critic decision: approve",
+  "started_at": "2024-01-15T11:00:00Z",
+  "finished_at": "2024-01-15T11:05:00Z",
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "",
+  "artifacts": [],
+  "metrics": {
+    "duration_ms": 300000,
+    "cost_usd": 0.0,
+    "tokens_in": 0,
+    "tokens_out": 0
   },
-  "assumptions_to_verify": [
-    "Tests exist for parseURL",
-    "Null is acceptable return value"
-  ],
-  "acceptance_criteria": [
-    "parseURL(null) returns null without throwing",
-    "All existing tests still pass",
-    "No other behavior changed"
-  ],
-  "test_plan": [
-    "npm test -- parseURL.test.ts",
-    "Manual: parseURL(null) returns null"
-  ],
-  "reviewer_notes": "Simple null check to prevent a crash. Backward compatible — returns null instead of an Exception.",
-  "merge_probability": {
-    "estimate": 0.9,
-    "drivers_positive": [
-      "Fixes crash (clear value)",
-      "Tiny scope (5 LOC)",
-      "Zero risk of regression",
-      "Reported in issue #123"
+  "errors": [],
+  "warnings": [],
+  "data": {
+    "decision": "approve",
+    "top_reasons": [
+      "Fixes reported bug #123",
+      "Minimal scope (1 file, 5 LOC)",
+      "Low risk (null check only)",
+      "Clear test plan"
     ],
-    "drivers_negative": []
-  },
-  "go_no_go_next_step": "approve → Implementer"
+    "must_fix_before_implement": [],
+    "scope_cut": {
+      "keep": [
+        "Add null check in parseURL"
+      ],
+      "drop": [],
+      "split_into_separate_prs": []
+    },
+    "assumptions_to_verify": [
+      "Tests exist for parseURL",
+      "Null is acceptable return value"
+    ],
+    "acceptance_criteria": [
+      "parseURL(null) returns null without throwing",
+      "All existing tests still pass",
+      "No other behavior changed"
+    ],
+    "test_plan": [
+      "npm test -- parseURL.test.ts",
+      "Manual: parseURL(null) returns null"
+    ],
+    "reviewer_notes": "Simple null check to prevent a crash. Backward compatible — returns null instead of an Exception.",
+    "merge_probability": {
+      "estimate": 0.9,
+      "drivers_positive": [
+        "Fixes crash (clear value)",
+        "Tiny scope (5 LOC)",
+        "Zero risk of regression",
+        "Reported in issue #123"
+      ],
+      "drivers_negative": []
+    },
+    "go_no_go_next_step": "approve → Implementer"
+  }
 }
 ```
 
@@ -186,42 +207,63 @@ Changes are unnecessary/too risky/not a fit for the project.
 
 ```json
 {
-  "decision": "approve",
-  "top_reasons": [
-    "Fixes crash in parseURL (issue #123)",
-    "Minimal scope (1 function, 5 LOC)",
-    "Low risk (defensive code only)",
-    "Clear test coverage"
-  ],
-  "must_fix_before_implement": [],
-  "scope_cut": {
-    "keep": ["Add null check in parseURL"],
-    "drop": [],
-    "split_into_separate_prs": []
+  "schema_version": "1.0",
+  "id": "critic-<timestamp>",
+  "stage": "critic",
+  "status": "success",
+  "summary": "Critic decision: approve",
+  "started_at": "2024-01-15T11:00:00Z",
+  "finished_at": "2024-01-15T11:05:00Z",
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "",
+  "artifacts": [],
+  "metrics": {
+    "duration_ms": 1,
+    "cost_usd": 0.0,
+    "tokens_in": 0,
+    "tokens_out": 0
   },
-  "assumptions_to_verify": [
-    "parseURL tests exist",
-    "Returning null is acceptable"
-  ],
-  "acceptance_criteria": [
-    "parseURL(null) returns null",
-    "No exceptions thrown",
-    "Existing tests pass"
-  ],
-  "test_plan": [
-    "npm test -- parseURL.test.ts"
-  ],
-  "reviewer_notes": "Simple null check. Backward compatible.",
-  "merge_probability": {
-    "estimate": 0.95,
-    "drivers_positive": [
-      "Reported bug",
-      "Tiny scope",
-      "Zero controversy"
+  "errors": [],
+  "warnings": [],
+  "data": {
+    "decision": "approve",
+    "top_reasons": [
+      "Fixes crash in parseURL (issue #123)",
+      "Minimal scope (1 function, 5 LOC)",
+      "Low risk (defensive code only)",
+      "Clear test coverage"
     ],
-    "drivers_negative": []
-  },
-  "go_no_go_next_step": "approve → Implementer"
+    "must_fix_before_implement": [],
+    "scope_cut": {
+      "keep": ["Add null check in parseURL"],
+      "drop": [],
+      "split_into_separate_prs": []
+    },
+    "assumptions_to_verify": [
+      "parseURL tests exist",
+      "Returning null is acceptable"
+    ],
+    "acceptance_criteria": [
+      "parseURL(null) returns null",
+      "No exceptions thrown",
+      "Existing tests pass"
+    ],
+    "test_plan": [
+      "npm test -- parseURL.test.ts"
+    ],
+    "reviewer_notes": "Simple null check. Backward compatible.",
+    "merge_probability": {
+      "estimate": 0.95,
+      "drivers_positive": [
+        "Reported bug",
+        "Tiny scope",
+        "Zero controversy"
+      ],
+      "drivers_negative": []
+    },
+    "go_no_go_next_step": "approve → Implementer"
+  }
 }
 ```
 
@@ -229,40 +271,61 @@ Changes are unnecessary/too risky/not a fit for the project.
 
 ```json
 {
-  "decision": "revise",
-  "top_reasons": [
-    "Good idea but scope too large",
-    "Can split into 3 separate PRs",
-    "Each PR independently valuable"
-  ],
-  "must_fix_before_implement": [
-    "Split into 3 PRs: null check, test addition, docs update",
-    "Start with null check only (highest priority)"
-  ],
-  "scope_cut": {
-    "keep": [
-      "Add null check in parseURL"
+  "schema_version": "1.0",
+  "id": "critic-<timestamp>",
+  "stage": "critic",
+  "status": "success",
+  "summary": "Critic decision: revise",
+  "started_at": "2024-01-15T11:00:00Z",
+  "finished_at": "2024-01-15T11:05:00Z",
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "",
+  "artifacts": [],
+  "metrics": {
+    "duration_ms": 1,
+    "cost_usd": 0.0,
+    "tokens_in": 0,
+    "tokens_out": 0
+  },
+  "errors": [],
+  "warnings": [],
+  "data": {
+    "decision": "revise",
+    "top_reasons": [
+      "Good idea but scope too large",
+      "Can split into 3 separate PRs",
+      "Each PR independently valuable"
     ],
-    "drop": [],
-    "split_into_separate_prs": [
-      "PR 1: Add null check in parseURL (priority: high)",
-      "PR 2: Add edge case tests for parseURL (priority: medium)",
-      "PR 3: Update parseURL docs with edge cases (priority: low)"
-    ]
-  },
-  "assumptions_to_verify": [],
-  "acceptance_criteria": [],
-  "test_plan": [],
-  "reviewer_notes": "Split into 3 PRs. Start with the null check (most important).",
-  "merge_probability": {
-    "estimate": 0.3,
-    "drivers_positive": [],
-    "drivers_negative": [
-      "Scope too large (80 LOC, 4 files)",
-      "3 different values mixed together"
-    ]
-  },
-  "go_no_go_next_step": "revise → Analyst"
+    "must_fix_before_implement": [
+      "Split into 3 PRs: null check, test addition, docs update",
+      "Start with null check only (highest priority)"
+    ],
+    "scope_cut": {
+      "keep": [
+        "Add null check in parseURL"
+      ],
+      "drop": [],
+      "split_into_separate_prs": [
+        "PR 1: Add null check in parseURL (priority: high)",
+        "PR 2: Add edge case tests for parseURL (priority: medium)",
+        "PR 3: Update parseURL docs with edge cases (priority: low)"
+      ]
+    },
+    "assumptions_to_verify": [],
+    "acceptance_criteria": [],
+    "test_plan": [],
+    "reviewer_notes": "Split into 3 PRs. Start with the null check (most important).",
+    "merge_probability": {
+      "estimate": 0.3,
+      "drivers_positive": [],
+      "drivers_negative": [
+        "Scope too large (80 LOC, 4 files)",
+        "3 different values mixed together"
+      ]
+    },
+    "go_no_go_next_step": "revise → Analyst"
+  }
 }
 ```
 
@@ -270,36 +333,57 @@ Changes are unnecessary/too risky/not a fit for the project.
 
 ```json
 {
-  "decision": "reject",
-  "top_reasons": [
-    "No clear necessity (subjective improvement)",
-    "Large scope (200 LOC)",
-    "Risk of introducing bugs",
-    "No maintainer request"
-  ],
-  "must_fix_before_implement": [],
-  "scope_cut": {
-    "keep": [],
-    "drop": [
-      "Refactor validation module to class-based"
+  "schema_version": "1.0",
+  "id": "critic-<timestamp>",
+  "stage": "critic",
+  "status": "success",
+  "summary": "Critic decision: reject",
+  "started_at": "2024-01-15T11:00:00Z",
+  "finished_at": "2024-01-15T11:05:00Z",
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "",
+  "artifacts": [],
+  "metrics": {
+    "duration_ms": 1,
+    "cost_usd": 0.0,
+    "tokens_in": 0,
+    "tokens_out": 0
+  },
+  "errors": [],
+  "warnings": [],
+  "data": {
+    "decision": "reject",
+    "top_reasons": [
+      "No clear necessity (subjective improvement)",
+      "Large scope (200 LOC)",
+      "Risk of introducing bugs",
+      "No maintainer request"
     ],
-    "split_into_separate_prs": []
-  },
-  "assumptions_to_verify": [],
-  "acceptance_criteria": [],
-  "test_plan": [],
-  "reviewer_notes": "Subjective improvement without clear benefit. No request from maintainer. Better to leave as is or open an issue for discussion first.",
-  "merge_probability": {
-    "estimate": 0.1,
-    "drivers_positive": [],
-    "drivers_negative": [
-      "Subjective 'cleaner' claim",
-      "Large refactor (200 LOC)",
-      "No proof of benefit",
-      "No issue/discussion"
-    ]
-  },
-  "go_no_go_next_step": "reject → stop"
+    "must_fix_before_implement": [],
+    "scope_cut": {
+      "keep": [],
+      "drop": [
+        "Refactor validation module to class-based"
+      ],
+      "split_into_separate_prs": []
+    },
+    "assumptions_to_verify": [],
+    "acceptance_criteria": [],
+    "test_plan": [],
+    "reviewer_notes": "Subjective improvement without clear benefit. No request from maintainer. Better to leave as is or open an issue for discussion first.",
+    "merge_probability": {
+      "estimate": 0.1,
+      "drivers_positive": [],
+      "drivers_negative": [
+        "Subjective 'cleaner' claim",
+        "Large refactor (200 LOC)",
+        "No proof of benefit",
+        "No issue/discussion"
+      ]
+    },
+    "go_no_go_next_step": "reject → stop"
+  }
 }
 ```
 

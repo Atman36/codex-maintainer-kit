@@ -14,11 +14,19 @@ import argparse
 import fnmatch
 import json
 import re
-import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+# Ensure `tools/` is on sys.path so this script works both as:
+# - `python tools/quality_gate.py ...`
+# - imported/executed from other working directories
+TOOLS_DIR = Path(__file__).resolve().parent
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
+from pr_factory_lib.git_utils import git_status_entries, git_status_paths, is_git_repo, run_git  # noqa: E402
 
 DEFAULT_FORBIDDEN_GLOBS = [
     ".agentplane/**",
@@ -52,39 +60,6 @@ SECRET_REGEXES = [
 ]
 
 TEXT_FILE_MAX_BYTES = 512_000  # 512KB
-
-
-def run(cmd: List[str], cwd: Path, check: bool = False) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, check=check)
-
-
-def is_git_repo(repo_root: Path) -> bool:
-    return (repo_root / ".git").exists()
-
-
-def git_status_entries(repo_root: Path) -> List[StatusEntry]:
-    """
-    Returns modified/added/untracked paths with porcelain status code.
-    """
-    if not is_git_repo(repo_root):
-        return []
-    p = run(["git", "status", "--porcelain"], cwd=repo_root)
-    entries: List[StatusEntry] = []
-    for line in p.stdout.splitlines():
-        if not line.strip():
-            continue
-        # Format: XY <path> or XY <path> -> <path>
-        # e.g. "?? foo.txt", " M src/a.py", "R  old -> new"
-        code = line[:2]
-        parts = line[3:].split("->")
-        path = parts[-1].strip()
-        if path:
-            entries.append(StatusEntry(code=code, path=path))
-    return entries
-
-
-def git_status_paths(repo_root: Path) -> List[str]:
-    return sorted({entry.path for entry in git_status_entries(repo_root)})
 
 
 def glob_match(path: str, pattern: str) -> bool:
@@ -159,12 +134,6 @@ class DiffStats:
     paths: List[str]
 
 
-@dataclass
-class StatusEntry:
-    code: str
-    path: str
-
-
 def git_diff_stats(repo_root: Path, base_ref: str = "HEAD") -> DiffStats:
     """
     Compute diff stats for working tree vs base_ref.
@@ -173,7 +142,7 @@ def git_diff_stats(repo_root: Path, base_ref: str = "HEAD") -> DiffStats:
     if not is_git_repo(repo_root):
         return DiffStats(files=0, insertions=0, deletions=0, paths=[])
 
-    p = run(["git", "diff", "--numstat", base_ref], cwd=repo_root)
+    p = run_git(["diff", "--numstat", base_ref], cwd=repo_root)
     files = 0
     ins = 0
     dels = 0

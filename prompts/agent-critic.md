@@ -26,28 +26,44 @@ HARD REJECT IF:
 - Нужна безопасность/крипто/аутентификация — но нет доменной уверенности/пруфов.
 
 OUTPUT:
-1) Сформируй СТРОГО JSON (без Markdown и пояснений вокруг) по структуре ниже.
+1) Сформируй СТРОГО JSON (без Markdown и пояснений вокруг) по схеме `schemas/execution_result.schema.json`.
 2) Сохрани JSON в `/Users/Apple/Developer/pr-factory-kit/analysis_report/critic-<timestamp>.json`.
 3) В чат верни только `SAVED_JSON_PATH=<absolute_path_to_json>`.
 {
-  "decision": "approve" | "revise" | "reject",
-  "top_reasons": ["..."],
-  "must_fix_before_implement": ["..."],
-  "scope_cut": {
-    "keep": ["..."],
-    "drop": ["..."],
-    "split_into_separate_prs": ["..."]
-  },
-  "assumptions_to_verify": ["..."],
-  "acceptance_criteria": ["..."],
-  "test_plan": ["..."],
-  "reviewer_notes": ["как объяснить maintainer’у ценность в 2-3 предложениях"],
-  "merge_probability": {
-    "estimate": 0.0,
-    "drivers_positive": ["..."],
-    "drivers_negative": ["..."]
-  },
-  "go_no_go_next_step": "если approve → Implementer; если revise → Analyst; если reject → остановить"
+  "schema_version": "1.0",
+  "id": "critic-<timestamp>",
+  "stage": "critic",
+  "status": "success",
+  "summary": "Critic decision: approve|revise|reject",
+  "started_at": "<iso8601>",
+  "finished_at": "<iso8601>",
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "",
+  "artifacts": [],
+  "metrics": { "duration_ms": 0, "cost_usd": 0.0, "tokens_in": 0, "tokens_out": 0 },
+  "errors": [],
+  "warnings": [],
+  "data": {
+    "decision": "approve" | "revise" | "reject",
+    "top_reasons": ["..."],
+    "must_fix_before_implement": ["..."],
+    "scope_cut": {
+      "keep": ["..."],
+      "drop": ["..."],
+      "split_into_separate_prs": ["..."]
+    },
+    "assumptions_to_verify": ["..."],
+    "acceptance_criteria": ["..."],
+    "test_plan": ["..."],
+    "reviewer_notes": "как объяснить maintainer’у ценность в 2-3 предложениях",
+    "merge_probability": {
+      "estimate": 0.0,
+      "drivers_positive": ["..."],
+      "drivers_negative": ["..."]
+    },
+    "go_no_go_next_step": "если approve → Implementer; если revise → Analyst; если reject → остановить"
+  }
 }
 
 IMPORTANT STYLE:

@@ -16,11 +16,22 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+
+# Ensure `tools/` is on sys.path so this script works both as:
+# - `python tools/run_pipeline.py ...`
+# - imported via tests using importlib.spec_from_file_location(...)
+TOOLS_DIR = Path(__file__).resolve().parent
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
+from pr_factory_lib.git_utils import run_git  # noqa: E402
+from pr_factory_lib.json_utils import parse_stage_output, write_json  # noqa: E402
 
 
 MODE_ANALYSIS_STAGE_ORDER: Dict[str, List[str]] = {
@@ -152,29 +163,6 @@ def expand_template(template: str, values: Dict[str, str]) -> str:
     return out
 
 
-def parse_json_output(stdout: str) -> Dict[str, Any]:
-    text = stdout.strip()
-    if not text:
-        raise ValueError("Stage produced empty stdout; expected JSON.")
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError as exc:
-        path_match = re.search(r"SAVED_JSON_PATH\s*=\s*(\S+\.json)\b", text)
-        if not path_match:
-            raise ValueError(f"Stage stdout is not valid JSON: {exc}") from exc
-
-        json_path = Path(path_match.group(1)).expanduser()
-        if not json_path.is_file():
-            raise ValueError(f"Stage reported SAVED_JSON_PATH but file does not exist: {json_path}") from exc
-
-        try:
-            return json.loads(json_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as file_exc:
-            raise ValueError(
-                f"Stage SAVED_JSON_PATH is not valid JSON ({json_path}): {file_exc}"
-            ) from file_exc
-
-
 def run_process(command: str, cwd: Path, env: Dict[str, str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         command,
@@ -207,7 +195,7 @@ def run_stage(
 
     payload: Optional[Dict[str, Any]] = None
     if proc.returncode == 0:
-        payload = parse_json_output(proc.stdout)
+        payload = parse_stage_output(proc.stdout)
     return StageRun(
         stage=stage,
         command=command,
@@ -217,15 +205,6 @@ def run_stage(
         payload=payload,
         elapsed_ms=elapsed_ms,
         runner=adapter.name,
-    )
-
-
-def run_git(args: Sequence[str], cwd: Path) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["git", *args],
-        cwd=str(cwd),
-        capture_output=True,
-        text=True,
     )
 
 
@@ -253,6 +232,13 @@ def stage_status(payload: Dict[str, Any]) -> str:
 
 
 def critic_decision(payload: Dict[str, Any]) -> str:
+    data = payload.get("data")
+    if isinstance(data, dict):
+        decision = data.get("decision")
+        if isinstance(decision, str):
+            return decision.strip().lower()
+
+    # Backward-compat: older Critic payloads used top-level "decision".
     return str(payload.get("decision", "")).strip().lower()
 
 
@@ -439,10 +425,6 @@ def extract_pr_specs(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
         seen_keys.add(key)
         unique.append(spec)
     return unique
-
-
-def write_json(path: Path, payload: Dict[str, Any]) -> None:
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def select_runner(mode: str, task_runner_cmd: str, cwd: Path) -> Tuple[RunnerAdapter, List[str]]:

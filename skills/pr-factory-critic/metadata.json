@@ -50,12 +50,12 @@
       "description": "Hint for allowed files (optional)"
     }
   ],
-  "outputs": ["CriticDecision"],
+  "outputs": ["ExecutionResult"],
   "decisions": ["approve", "revise", "reject"],
   "next_stages": {
     "approve": "gatekeeper",
     "revise": "analyst",
     "reject": null
   },
-  "note": "Critic outputs a simplified JSON format (not ExecutionResult) with decision and evaluation details"
+  "note": "Critic outputs ExecutionResult with decision and evaluation details under data.*"
 }

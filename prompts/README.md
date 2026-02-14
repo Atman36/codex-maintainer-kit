@@ -11,7 +11,7 @@ These prompts are designed to be *short* and stack-agnostic.
 ## Output
 Execution payloads are JSON-based and conform to `schemas/execution_result.schema.json`.
 Analysis prompts (`scout`, `analyst`, `architecture_improvements`, `gatekeeper`, `agent-critic`) now save JSON to `/Users/Apple/Developer/pr-factory-kit/analysis_report/` and return `SAVED_JSON_PATH=...` in chat.
-Role-specific payload goes into `ExecutionResult.data` (or critic decision schema for `agent-critic`).
+Role-specific payload goes into `ExecutionResult.data`.
 
 ## Recommended entrypoint
 - Use `prompts/pipeline.md` for end-to-end ordered workflow:
