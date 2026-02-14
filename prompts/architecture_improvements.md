@@ -19,10 +19,12 @@ Find **one** architectural improvement that:
 ## Rules
 - Don’t propose big rewrites or new frameworks.
 - Don’t add new dependencies unless truly necessary.
-- Output **JSON only** (`ExecutionResult`) with either:
+- Build schema-valid `ExecutionResult` JSON payload with either:
   - data.candidate (a single candidate PR) or
   - status = needs_human with an Issue proposal if risky.
+- Save payload to `/Users/Apple/Developer/pr-factory-kit/analysis_report/architect-<timestamp>.json`.
+- In chat output only: `SAVED_JSON_PATH=<absolute_path_to_json>`.
 
-## Output (JSON)
-Return `ExecutionResult` stage=`analysis` with:
+## Output (JSON payload to save in file)
+Build `ExecutionResult` stage=`analysis` with:
 - data.candidate: {id,title,change_type:"refactor",risk,est_loc,targets[],rationale,design_sketch,verification:{commands[]}}

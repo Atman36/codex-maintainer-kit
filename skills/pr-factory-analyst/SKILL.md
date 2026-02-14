@@ -9,7 +9,8 @@ description: |
   - Looking for high-probability merge candidates
   - Want deeper quality assessment before implementation
 
-  Outputs structured JSON (ExecutionResult) with 5 candidates and merge expectation.
+  Builds structured JSON (ExecutionResult) with 5 candidates and merge expectation.
+  Saves it to `/Users/Apple/Developer/pr-factory-kit/analysis_report/` and returns only the saved path in chat.
 license: MIT
 ---
 
@@ -71,12 +72,14 @@ Each candidate **must** include:
 - **One PR = One Value**: Each candidate should be independently mergeable
 - **Prefer low-risk wins**: Docs, tests, small bugfixes, clearer errors, minor perf with proof
 - **Avoid high-risk changes**: Mass formatting, big refactors, dependency changes, API breaks
-- **Output JSON only**: Must conform to `ExecutionResult` schema
+- **Schema-valid JSON payload**: Build payload conforming to `ExecutionResult`
+- **Persist analysis JSON**: Write payload to `/Users/Apple/Developer/pr-factory-kit/analysis_report/analyst-<timestamp>.json`
+- **Chat output format**: Return only `SAVED_JSON_PATH=<absolute_path_to_json>`
 - **Scope context explicitly**: Return `data.related_files` to constrain downstream implementation context
 
 ## Output Format
 
-Return JSON conforming to `../../schemas/execution_result.schema.json`:
+1. Build JSON conforming to `../../schemas/execution_result.schema.json`:
 
 ```json
 {
@@ -133,6 +136,16 @@ Return JSON conforming to `../../schemas/execution_result.schema.json`:
     }
   }
 }
+```
+
+2. Save the JSON file to:
+
+`/Users/Apple/Developer/pr-factory-kit/analysis_report/analyst-<timestamp>.json`
+
+3. Return to chat only:
+
+```text
+SAVED_JSON_PATH=/Users/Apple/Developer/pr-factory-kit/analysis_report/analyst-<timestamp>.json
 ```
 
 ## Focus Area Guidance

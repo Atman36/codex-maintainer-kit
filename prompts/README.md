@@ -9,8 +9,9 @@ These prompts are designed to be *short* and stack-agnostic.
 - For automation, prefer deterministic orchestration in code (`tools/run_pipeline.py`) over one giant manager prompt.
 
 ## Output
-All prompts request **JSON only** conforming to `schemas/execution_result.schema.json`.
-Role-specific payload goes into `ExecutionResult.data`.
+Execution payloads are JSON-based and conform to `schemas/execution_result.schema.json`.
+Analysis prompts (`scout`, `analyst`, `architecture_improvements`, `gatekeeper`, `agent-critic`) now save JSON to `/Users/Apple/Developer/pr-factory-kit/analysis_report/` and return `SAVED_JSON_PATH=...` in chat.
+Role-specific payload goes into `ExecutionResult.data` (or critic decision schema for `agent-critic`).
 
 ## Recommended entrypoint
 - Use `prompts/pipeline.md` for end-to-end ordered workflow:

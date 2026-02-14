@@ -4,7 +4,7 @@
 
 ## Overview
 
-Этот каталог содержит 10 агентов PR Factory, преобразованных в формат Skills для использования в различных AI IDE (Claude Code, Codex, Opencode, Kimi). Каждый skill представляет собой специализированного агента с четко определенной ролью в pipeline создания PR.
+Этот каталог содержит 11 агентов PR Factory, преобразованных в формат Skills для использования в различных AI IDE (Claude Code, Codex, Opencode, Kimi). Каждый skill представляет собой специализированного агента с четко определенной ролью в pipeline создания PR.
 
 ## Available Skills
 
@@ -20,6 +20,7 @@
 | [pr-factory-publisher](pr-factory-publisher/) | 7. Publish | Fork/push/open PR from an implemented PRSpec | User explicitly asked to publish a PR |
 | [pr-factory-critic](pr-factory-critic/) | Gate | Pre-implementation evaluation | Need to evaluate proposed changes before implementation |
 | [pr-factory-architect](pr-factory-architect/) | Alternative | Find small architectural improvements | Looking for refactoring opportunities (<200 LOC) |
+| [pr-factory-code-editor](pr-factory-code-editor/) | Utility | Targeted code edits without full pipeline | User asks for direct code changes/bugfixes with minimal scope |
 
 ## Pipeline Flow
 
@@ -119,7 +120,7 @@ Skills reference shared resources in the repository root:
 - **execution_result.schema.json** - Standard output format for all agents
 - **prspec.schema.json** - PR specification format
 
-All skills output JSON conforming to `ExecutionResult` schema.
+Execution payloads are JSON-based. Analysis skills (`scout`, `analyst`, `architect`, `critic`, `gatekeeper`) persist JSON files to `/Users/Apple/Developer/pr-factory-kit/analysis_report/` and return `SAVED_JSON_PATH=...` in chat.
 
 ### Tools (../../tools/)
 
@@ -177,7 +178,7 @@ For fully automated PR creation:
 
 1. Start with `pr-factory-pipeline` (mode: `full`)
 2. Internal order: Scout → Analyst → Critic → Gatekeeper → Implementer → Reviewer → PR Writer
-3. Each stage outputs JSON consumed by next
+3. Each stage outputs JSON payloads consumed by next (direct JSON or via `SAVED_JSON_PATH`)
 4. Critic and Reviewer act as quality gates
 
 ### Pattern 2: Manual Selection (Interactive)
@@ -297,8 +298,8 @@ For Critic:
 
 ### Output Not Valid JSON
 
-1. Skills should output JSON only (no markdown)
-2. Check schema: `../../schemas/execution_result.schema.json`
+1. Validate JSON payload against schema: `../../schemas/execution_result.schema.json`
+2. For analysis stages, inspect file from `SAVED_JSON_PATH` in `/Users/Apple/Developer/pr-factory-kit/analysis_report/`
 3. Validate with: `python -m jsonschema schemas/execution_result.schema.json < output.json`
 
 ### Placeholders Not Filled

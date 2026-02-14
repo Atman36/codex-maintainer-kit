@@ -1,0 +1,41 @@
+{
+  "name": "pr-factory-code-editor",
+  "version": "1.0.0",
+  "description": "Safely apply targeted code edits with minimal diff and explicit verification",
+  "type": "agent",
+  "stage": "implementation",
+  "license": "MIT",
+  "inputs": [
+    {
+      "name": "REPO_ROOT",
+      "type": "string",
+      "required": true,
+      "description": "Workspace path"
+    },
+    {
+      "name": "CHANGE_REQUEST",
+      "type": "string",
+      "required": true,
+      "description": "Requested code edits"
+    },
+    {
+      "name": "FILE_HINTS",
+      "type": "array",
+      "required": false,
+      "description": "Optional target files"
+    },
+    {
+      "name": "CONSTRAINTS",
+      "type": "array",
+      "required": false,
+      "description": "Optional constraints for implementation"
+    },
+    {
+      "name": "VERIFY_COMMANDS",
+      "type": "array",
+      "required": false,
+      "description": "Optional verification commands"
+    }
+  ],
+  "outputs": ["EditSummary"]
+}

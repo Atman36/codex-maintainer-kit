@@ -9,7 +9,8 @@ description: |
   - Need architectural improvement that fits in small PR (<200 LOC)
   - Seeking to clarify boundaries or isolate side-effects
 
-  Outputs structured JSON (ExecutionResult) with one architectural improvement candidate.
+  Builds structured JSON (ExecutionResult) with one architectural improvement candidate.
+  Saves it to `/Users/Apple/Developer/pr-factory-kit/analysis_report/` and returns only the saved path in chat.
 license: MIT
 ---
 
@@ -89,7 +90,9 @@ For detailed patterns and examples, see [references/refactoring-patterns.md](ref
 - **Don't propose new frameworks**: Use existing tools
 - **Don't add dependencies** unless truly necessary
 - **Don't change public API** unless internal/unstable
-- **Output JSON only**: Must conform to `ExecutionResult` schema
+- **Schema-valid JSON payload**: Build payload conforming to `ExecutionResult`
+- **Persist analysis JSON**: Write payload to `/Users/Apple/Developer/pr-factory-kit/analysis_report/architect-<timestamp>.json`
+- **Chat output format**: Return only `SAVED_JSON_PATH=<absolute_path_to_json>`
 
 ## Process
 
@@ -101,7 +104,7 @@ For detailed patterns and examples, see [references/refactoring-patterns.md](ref
 
 ## Output Format
 
-Return JSON conforming to `../../schemas/execution_result.schema.json`:
+1. Build JSON conforming to `../../schemas/execution_result.schema.json`:
 
 ```json
 {
@@ -170,6 +173,16 @@ If improvement is **risky** or requires **discussion**, return `status: needs_hu
     }
   }
 }
+```
+
+2. Save the JSON file to:
+
+`/Users/Apple/Developer/pr-factory-kit/analysis_report/architect-<timestamp>.json`
+
+3. Return to chat only:
+
+```text
+SAVED_JSON_PATH=/Users/Apple/Developer/pr-factory-kit/analysis_report/architect-<timestamp>.json
 ```
 
 ## Quality Standards

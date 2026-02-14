@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/prfactory/PipelineSummary.schema.json",
+  "title": "PipelineSummary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "generated_at",
+    "pipeline_mode",
+    "runner_selected",
+    "status",
+    "preflight",
+    "stage_durations",
+    "pr_results",
+    "errors",
+    "warnings"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "pipeline_mode": {
+      "type": "string",
+      "enum": ["full", "quick-win", "architecture"]
+    },
+    "runner_selected": {
+      "type": "string",
+      "enum": ["task", "cli"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["success", "needs_human"]
+    },
+    "preflight": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "base_sha_at_start", "checks"],
+      "properties": {
+        "passed": {
+          "type": "boolean"
+        },
+        "base_sha_at_start": {
+          "type": "string"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "status", "detail", "next_action"],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["ok", "warn", "failed"]
+              },
+              "detail": {
+                "type": "string"
+              },
+              "next_action": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "stage_durations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["stage", "elapsed_ms"],
+        "properties": {
+          "stage": {
+            "type": "string"
+          },
+          "elapsed_ms": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "pr_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "index",
+          "id",
+          "status",
+          "publish_url",
+          "base_sha_at_start",
+          "base_sha_at_publish"
+        ],
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": ["success", "needs_human"]
+          },
+          "publish_url": {
+            "type": "string"
+          },
+          "base_sha_at_start": {
+            "type": "string"
+          },
+          "base_sha_at_publish": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["reason", "failed_stage", "next_action"],
+        "properties": {
+          "reason": {
+            "type": "string"
+          },
+          "failed_stage": {
+            "type": "string"
+          },
+          "next_action": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

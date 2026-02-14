@@ -25,7 +25,10 @@ HARD REJECT IF:
 - Diff будет шумным (mass-format, rename-storm) без функциональной выгоды.
 - Нужна безопасность/крипто/аутентификация — но нет доменной уверенности/пруфов.
 
-OUTPUT: Верни СТРОГО JSON (без Markdown и пояснений вокруг).
+OUTPUT:
+1) Сформируй СТРОГО JSON (без Markdown и пояснений вокруг) по структуре ниже.
+2) Сохрани JSON в `/Users/Apple/Developer/pr-factory-kit/analysis_report/critic-<timestamp>.json`.
+3) В чат верни только `SAVED_JSON_PATH=<absolute_path_to_json>`.
 {
   "decision": "approve" | "revise" | "reject",
   "top_reasons": ["..."],

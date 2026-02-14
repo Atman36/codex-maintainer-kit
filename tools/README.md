@@ -109,26 +109,28 @@ Deterministic orchestrator for staged PR Factory execution.
 
 ### What it does
 
-1. Enforces strict stage order by mode (`full`, `quick-win`, `architecture`)
-2. Executes stage commands passed from CLI or config
-3. Applies quality gates at each stage:
+1. Runs a mandatory `preflight` stage before any long-running pipeline work.
+2. Supports runner adapters: `--runner auto|task|cli`.
+3. Enforces strict stage order by mode (`full`, `quick-win`, `architecture`).
+4. Executes analysis stages once, then runs implementation stages per PRSpec (multi-PR).
+5. Applies quality gates at each stage:
    - `critic` → must be `approve`
    - `gatekeeper` → must be `pr`
-   - `implementer`, `reviewer`, `pr_writer` → must be `success`
-4. Self-healing loop for Implementer (default: up to 3 attempts)
-5. Passes outputs between stages via JSON
+   - `implement`, `reviewer`, `pr_writer`, `publish` → must be `success`
+6. Self-healing loop for Implementer (default: up to 3 attempts).
+7. Writes machine-readable `pipeline-summary.json` and embeds structured error blocks.
 
 ### Pipeline Modes
 
-| Mode | Stages Executed | Use Case |
-|------|-----------------|----------|
-| `full` | scout → analyst → critic → gatekeeper → implementer → reviewer → pr_writer | Complete analysis |
-| `quick-win` | scout → gatekeeper → implementer → reviewer → pr_writer | Obvious improvements |
-| `architecture` | architect → critic → gatekeeper → implementer → reviewer → pr_writer | Refactoring focus |
+| Mode | Analysis stages | Per-PR stages |
+|------|-----------------|---------------|
+| `full` | scout → analyst → critic → gatekeeper | implement → reviewer → pr_writer (+ publish if requested) |
+| `quick-win` | scout → gatekeeper | implement → reviewer → pr_writer (+ publish if requested) |
+| `architecture` | architect → critic → gatekeeper | implement → reviewer → pr_writer (+ publish if requested) |
 
 ### Usage Examples
 
-#### Full Pipeline
+#### Full Pipeline (`auto` runner)
 
 ```bash
 python tools/run_pipeline.py \
@@ -136,36 +138,41 @@ python tools/run_pipeline.py \
   --repo-url https://github.com/owner/repo \
   --mode full \
   --focus tests \
-  --max-prs 1 \
-  --stage-command scout='python -m skills.pr_factory_scout' \
-  --stage-command analyst='python -m skills.pr_factory_analyst' \
-  --stage-command critic='python -m skills.pr_factory_critic' \
-  --stage-command gatekeeper='python -m skills.pr_factory_gatekeeper' \
-  --stage-command implement='python -m skills.pr_factory_implementer' \
-  --stage-command reviewer='python -m skills.pr_factory_reviewer' \
-  --stage-command pr_writer='python -m skills.pr_factory_pr_writer'
+  --max-prs 2 \
+  --runner auto \
+  --stage-command scout='python tools/stages/scout.py --repo {{REPO_ROOT}}' \
+  --stage-command analyst='python tools/stages/analyst.py --input {{SCOUT_JSON}}' \
+  --stage-command critic='python tools/stages/critic.py --input {{ANALYST_JSON}}' \
+  --stage-command gatekeeper='python tools/stages/gatekeeper.py --input {{ANALYST_JSON}} --max-prs {{MAX_PRS}}' \
+  --stage-command implement='python tools/stages/implement.py --prspec {{PRSPEC_JSON}}' \
+  --stage-command reviewer='python tools/stages/reviewer.py --prspec {{PRSPEC_JSON}} --impl {{IMPLEMENT_JSON}}' \
+  --stage-command pr_writer='python tools/stages/pr_writer.py --prspec {{PRSPEC_JSON}} --impl {{IMPLEMENT_JSON}}' \
+  --summary-output /tmp/pipeline-summary.json
 ```
 
-#### Quick-Win Mode
+#### Force CLI Runner
 
 ```bash
 python tools/run_pipeline.py \
   --repo-root /path/to/repo \
   --mode quick-win \
-  --stage-command scout='python -m skills.pr_factory_scout' \
-  --stage-command gatekeeper='python -m skills.pr_factory_gatekeeper' \
-  --stage-command implement='python -m skills.pr_factory_implementer' \
-  --stage-command reviewer='python -m skills.pr_factory_reviewer' \
-  --stage-command pr_writer='python -m skills.pr_factory_pr_writer'
+  --runner cli \
+  --stage-command scout='python tools/stages/scout.py --repo {{REPO_ROOT}}' \
+  --stage-command gatekeeper='python tools/stages/gatekeeper.py --input {{SCOUT_JSON}} --max-prs {{MAX_PRS}}' \
+  --stage-command implement='python tools/stages/implement.py --prspec {{PRSPEC_JSON}}' \
+  --stage-command reviewer='python tools/stages/reviewer.py --prspec {{PRSPEC_JSON}} --impl {{IMPLEMENT_JSON}}' \
+  --stage-command pr_writer='python tools/stages/pr_writer.py --prspec {{PRSPEC_JSON}}'
 ```
 
-#### With External Context
+#### Task Runner Wrapper
 
 ```bash
 python tools/run_pipeline.py \
   --repo-root /path/to/repo \
-  --context-path /path/to/deepresearch \
   --mode full \
+  --runner task \
+  --task-runner-cmd 'task run --stage {{STAGE}} --command {{COMMAND}}' \
+  --stage-command scout='python tools/stages/scout.py --repo {{REPO_ROOT}}' \
   ...
 ```
 
@@ -182,6 +189,9 @@ The following placeholders are supported in stage commands:
 | `{{MODE}}` | Pipeline mode | CLI argument |
 | `{{MAX_PRS}}` | Max PRs to generate | CLI argument (default: 1) |
 | `{{CONTEXT_PATH}}` | External context path | CLI argument |
+| `{{PR_INDEX}}` | Current PRSpec index in multi-PR loop | Runtime |
+| `{{PRSPEC_JSON}}` | Current PRSpec JSON path | Runtime |
+| `{{HEAD_BRANCH}}` | Normalized head branch (`codex/<slug>`) | Runtime |
 | `{{SCOUT_JSON}}` | Scout output | Previous stage |
 | `{{ANALYST_JSON}}` | Analyst output | Previous stage |
 | `{{CRITIC_JSON}}` | Critic output | Previous stage |
@@ -239,56 +249,31 @@ Each stage must output valid JSON to stdout:
 }
 ```
 
-### Configuration File
+### Key Flags
 
-Instead of CLI arguments, you can use a config file:
+| Flag | Description |
+|------|-------------|
+| `--runner` | Execution backend: `auto`, `task`, `cli` |
+| `--task-runner-cmd` | Wrapper for task adapter (`{{COMMAND}}`, `{{STAGE}}`) |
+| `--allow-dirty` | Disable clean-worktree preflight enforcement |
+| `--base-drift-policy` | Drift handling before publish: `needs_human`, `warn`, `ignore` |
+| `--summary-output` | Path for machine-readable pipeline summary JSON |
+| `--publish` | Enable publish stage in per-PR loop |
 
-```bash
-python tools/run_pipeline.py --config pipeline.yaml
-```
+### Troubleshooting
 
-Example `pipeline.yaml`:
+| Symptom | Root cause | Fix |
+|---------|------------|-----|
+| `Detected skill names used as shell commands` | Skill ID passed as executable command in CLI mode | Use real command (`python ...`) or configure `--runner task` + `--task-runner-cmd` |
+| `Missing stage command(s)` | Not all required stage commands were provided | Add each missing `--stage-command stage=command` |
+| `Working tree is dirty` | Preflight clean-worktree policy | Commit/stash changes or rerun with `--allow-dirty` |
+| `Missing origin/<base>` | Base branch SHA cannot be resolved | `git fetch origin <base>` and rerun |
+| Publish fails at preflight auth | `gh auth status` failed | Run `gh auth login` |
+| Publish blocked by base drift | Base changed during long run | Rebase/cherry-pick on latest `origin/<base>` and rerun publish |
 
-```yaml
-repo_root: /path/to/repo
-repo_url: https://github.com/owner/repo
-mode: full
-focus: tests
-max_prs: 1
-stages:
-  scout:
-    command: python -m skills.pr_factory_scout
-    timeout: 300
-  analyst:
-    command: python -m skills.pr_factory_analyst
-    timeout: 600
-  critic:
-    command: python -m skills.pr_factory_critic
-    timeout: 300
-  gatekeeper:
-    command: python -m skills.pr_factory_gatekeeper
-    timeout: 300
-  implement:
-    command: python -m skills.pr_factory_implementer
-    timeout: 600
-    max_retries: 3
-  reviewer:
-    command: python -m skills.pr_factory_reviewer
-    timeout: 300
-  pr_writer:
-    command: python -m skills.pr_factory_pr_writer
-    timeout: 300
-```
+### Exit Code
 
-### Exit Codes
-
-| Code | Meaning |
-|------|---------|
-| `0` | Pipeline completed successfully |
-| `1` | Usage error |
-| `2` | Stage execution failed |
-| `3` | Quality gate rejected |
-| `4` | Timeout |
+`0` on full success, `1` on any preflight/stage/gate failure (`needs_human` result).
 
 ---
 
@@ -300,28 +285,9 @@ stages:
 # Validate JSON schemas
 python -m jsonschema schemas/execution_result.schema.json -i <(echo '{...}')
 python -m jsonschema schemas/prspec.schema.json -i <(echo '{...}')
-
-# Dry-run pipeline
-python tools/run_pipeline.py --repo-root /path/to/repo --mode full --dry-run
-```
-
-### Debugging
-
-Enable verbose output:
-
-```bash
-export PR_FACTORY_DEBUG=1
-python tools/run_pipeline.py ...
-```
-
-Save intermediate outputs:
-
-```bash
-python tools/run_pipeline.py \
-  --repo-root /path/to/repo \
-  --mode full \
-  --save-intermediates /tmp/pr-factory \
-  ...
+python -m jsonschema schemas/pipeline_summary.schema.json -i <(echo '{...}')
+# Run pipeline integration tests
+python -m unittest tools/tests/test_run_pipeline.py
 ```
 
 ---

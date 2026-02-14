@@ -30,4 +30,3 @@
 - `stage` = `pipeline`, `status` = `success|needs_human|failed`.
 - В `artifacts` добавь запись про отчёт: `{ "kind": "report", "path": "{{REPORT_PATH}}" }` (только если файл реально создан).
 - В `data` включи: `pipeline_mode`, `stage_summary[]`, `top_improvements[]`, `selected_prspec`, `final_pr_message` (может быть пустым), `report_path`.
-

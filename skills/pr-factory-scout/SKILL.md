@@ -9,7 +9,8 @@ description: |
   - Looking for 3-7 low-risk improvement candidates
   - Evaluating if a repository is a good target for automated PRs
 
-  Outputs structured JSON (ExecutionResult) with repo profile and candidates.
+  Builds structured JSON (ExecutionResult) with repo profile and candidates.
+  Saves it to `/Users/Apple/Developer/pr-factory-kit/analysis_report/` and returns only the saved path in chat.
 license: MIT
 ---
 
@@ -42,12 +43,14 @@ For detailed guidance on repo signals and scoring heuristics, see [references/re
 - **Be stack-agnostic**: Infer conventions from the repo; don't assume any framework
 - **Prefer small, low-risk PRs**: docs/tests/bugfix/CI/DX. Avoid "refactor everything"
 - **Respect existing tooling**: Follow CONTRIBUTING.md and existing tools. Don't suggest adding new deps unless unavoidable
-- **Output JSON only**: All output must conform to `ExecutionResult` schema
+- **Schema-valid JSON payload**: Build payload conforming to `ExecutionResult`
+- **Persist analysis JSON**: Write payload to `/Users/Apple/Developer/pr-factory-kit/analysis_report/scout-<timestamp>.json`
+- **Chat output format**: Return only `SAVED_JSON_PATH=<absolute_path_to_json>`
 - **Put all findings under `data`**: Keep structured results in the data field
 
 ## Output Format
 
-Return JSON conforming to `../../schemas/execution_result.schema.json`:
+1. Build JSON conforming to `../../schemas/execution_result.schema.json`:
 
 ```json
 {
@@ -112,6 +115,16 @@ Return JSON conforming to `../../schemas/execution_result.schema.json`:
     }
   }
 }
+```
+
+2. Save the JSON file to:
+
+`/Users/Apple/Developer/pr-factory-kit/analysis_report/scout-<timestamp>.json`
+
+3. Return to chat only:
+
+```text
+SAVED_JSON_PATH=/Users/Apple/Developer/pr-factory-kit/analysis_report/scout-<timestamp>.json
 ```
 
 ## Quality Standards

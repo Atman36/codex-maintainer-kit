@@ -11,6 +11,7 @@ Scout → Analyst → Critic → Gatekeeper → Implementer → Reviewer → PR 
   - `ExecutionResult` — uniform result envelope for *any* CLI/agent run.
 - `tools/quality_gate.py` — forbidden-files scanner + merge-probability heuristic + files_touched enforcement.
 - `tools/run_pipeline.py` — deterministic DAG orchestrator (stage order + gate checks + implement retries).
+- `tools/fetch_pr_comments.py` — fetch PR comments (issue + review) from GitHub for analysis.
 - `tools/README.md` — how to run the gate locally / in CI.
 
 ## Placeholders

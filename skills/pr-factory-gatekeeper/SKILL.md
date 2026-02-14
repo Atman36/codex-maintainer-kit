@@ -9,7 +9,8 @@ description: |
   - Creating PRSpec for implementation
   - Ensuring PR scope is minimal and easy to review
 
-  Outputs structured JSON (ExecutionResult) with decisions and PRSpec for top candidate.
+  Builds structured JSON (ExecutionResult) with decisions and PRSpec for top candidate.
+  Saves it to `/Users/Apple/Developer/pr-factory-kit/analysis_report/` and returns only the saved path in chat.
 license: MIT
 ---
 
@@ -74,11 +75,13 @@ For detailed PRSpec structure and minimal scope guidelines, see [references/prsp
 - **No mass formatting**: Even if code style is inconsistent
 - **No new deps**: Unless candidate explicitly justifies it
 - **No API breaks**: Unless repo version is 0.x and breaking changes are normal
-- **Output JSON only**: Must conform to `ExecutionResult` schema
+- **Schema-valid JSON payload**: Build payload conforming to `ExecutionResult`
+- **Persist analysis JSON**: Write payload to `/Users/Apple/Developer/pr-factory-kit/analysis_report/gatekeeper-<timestamp>.json`
+- **Chat output format**: Return only `SAVED_JSON_PATH=<absolute_path_to_json>`
 
 ## Output Format
 
-Return JSON conforming to `../../schemas/execution_result.schema.json`:
+1. Build JSON conforming to `../../schemas/execution_result.schema.json`:
 
 ```json
 {
@@ -168,6 +171,16 @@ Return JSON conforming to `../../schemas/execution_result.schema.json`:
     }
   }
 }
+```
+
+2. Save the JSON file to:
+
+`/Users/Apple/Developer/pr-factory-kit/analysis_report/gatekeeper-<timestamp>.json`
+
+3. Return to chat only:
+
+```text
+SAVED_JSON_PATH=/Users/Apple/Developer/pr-factory-kit/analysis_report/gatekeeper-<timestamp>.json
 ```
 
 ## Quality Standards

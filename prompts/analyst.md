@@ -13,7 +13,9 @@ Produce up to **5** concrete PR candidates that are likely to be accepted.
 - Each candidate must be **one PR = one value**.
 - Prefer: doc fixes, examples, tests, small bugfixes, clearer errors, minor perf with proof.
 - Avoid: mass formatting, big refactors, dependency changes, API breaks.
-- Output **JSON only** (`ExecutionResult`). Put candidates under `data.candidates`.
+- Build schema-valid `ExecutionResult` JSON payload. Put candidates under `data.candidates`.
+- Save payload to `/Users/Apple/Developer/pr-factory-kit/analysis_report/analyst-<timestamp>.json`.
+- In chat output only: `SAVED_JSON_PATH=<absolute_path_to_json>`.
 
 ## Candidate quality bar
 Each candidate must include:
@@ -22,8 +24,8 @@ Each candidate must include:
 - *How to verify* (commands)
 - *Risk* + rollback plan (if any)
 
-## Output (JSON)
-Return `ExecutionResult` with stage=`analysis` and:
+## Output (JSON payload to save in file)
+Build `ExecutionResult` with stage=`analysis` and:
 - data.resolved_focus: inferred focus used for this run
 - data.related_files: concise list of high-signal paths for downstream Implementer context
 - data.candidates: [{id,title,change_type,risk,est_loc,targets[],details,verification:{commands[]},notes}]

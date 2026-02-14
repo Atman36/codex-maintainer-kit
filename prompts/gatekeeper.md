@@ -17,11 +17,13 @@ Select up to `{{MAX_PRS}}` candidates and turn each into a **PRSpec** that is:
 - Gatekeeper is primarily technical shaping: if critic already approved, avoid re-doing strategic debate and focus on minimal executable PRSpec.
 - Reject anything that smells like: “refactor for aesthetics”, mass formatting, new deps, API break.
 - If uncertain, recommend **Issue first** (status needs_human) instead of PR.
-- Output **JSON only** (`ExecutionResult`) and include `pr_spec` for the top pick.
+- Build schema-valid `ExecutionResult` JSON payload and include `pr_spec` for the top pick.
   - For multiple PRs, put additional PRSpecs under `data.pr_specs[]`.
+- Save payload to `/Users/Apple/Developer/pr-factory-kit/analysis_report/gatekeeper-<timestamp>.json`.
+- In chat output only: `SAVED_JSON_PATH=<absolute_path_to_json>`.
 
-## Output (JSON)
-Return `ExecutionResult` with stage=`gatekeeper` and:
+## Output (JSON payload to save in file)
+Build `ExecutionResult` with stage=`gatekeeper` and:
 - status = success / needs_human / skipped
 - data.selected: [{candidate_id, decision:"pr|issue|skip", reasons[], blockers[]}]
 - pr_spec: PRSpec for the best PR (or omit and put in data.pr_specs if none)

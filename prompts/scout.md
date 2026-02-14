@@ -11,7 +11,9 @@ Quickly decide whether this repo is a good target *right now*, and list 3–7 **
 - Be stack-agnostic: infer conventions from the repo; don’t assume any framework.
 - Prefer small, low-risk PRs: docs/tests/bugfix/CI/DX. Avoid “refactor everything”.
 - Respect CONTRIBUTING.md and existing tooling. Don’t suggest adding new deps unless unavoidable.
-- Output **JSON only** that conforms to `ExecutionResult` schema.
+- Build schema-valid `ExecutionResult` JSON payload.
+- Save payload to `/Users/Apple/Developer/pr-factory-kit/analysis_report/scout-<timestamp>.json`.
+- In chat output only: `SAVED_JSON_PATH=<absolute_path_to_json>`.
 - Put all findings under `data`.
 
 ## What to do (fast)
@@ -22,8 +24,8 @@ Quickly decide whether this repo is a good target *right now*, and list 3–7 **
 4) Produce candidates with:
    - title, type, estimated LOC, likely files, risk, how to verify.
 
-## Output (JSON)
-Return an `ExecutionResult` with:
+## Output (JSON payload to save in file)
+Build an `ExecutionResult` with:
 - stage = `scout`
 - status = success / skipped
 - data.repo_profile: {stack_hints, ci_detected, commands:{test,lint,build}, config_paths:{test[],lint[],build[],ci[]}, constraints_from_contributing}

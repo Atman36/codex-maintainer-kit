@@ -1,3 +1,7 @@
 docx/
 deepresearch/
-.DS_Store
+artifacts/
+.DS_Store/
+.claude/
+merge_markdown.py
+analysis_report/
