@@ -14,6 +14,7 @@ Analysis prompts (`scout`, `analyst`, `architecture_improvements`, `gatekeeper`,
 Role-specific payload goes into `ExecutionResult.data`.
 
 ## Recommended entrypoint
+- Use `program.md` when you want a single compact file to hand to a chat agent.
 - Use `prompts/pipeline.md` for end-to-end ordered workflow:
   `Scout -> Analyst/Architect -> Critic -> Gatekeeper -> Implementer -> Reviewer -> PR Writer -> Publisher (optional)`.
 - This is the default prompt when user asks "проанализируй директорию с помощью агентов" and mentions `deepresearch`.

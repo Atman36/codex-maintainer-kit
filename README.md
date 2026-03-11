@@ -3,8 +3,14 @@
 This kit is designed for a multi-agent PR pipeline:
 Scout → Analyst → Critic → Gatekeeper → Implementer → Reviewer → PR Writer → Publisher.
 
+## Fastest agent entrypoint
+
+If you want a single file to hand to an agent, start with `program.md`.
+It plays the same role as a compact "operating program": what to read first, which workflow to prefer, and which constraints are non-negotiable.
+
 ## What’s inside
 
+- `program.md` — shortest agent-facing entrypoint for the whole repo.
 - `prompts/` — compact role prompts (stack-agnostic).
 - `schemas/` — strict JSON Schemas:
   - `PRSpec` — what we intend to ship as a PR.
@@ -39,3 +45,9 @@ python3 -m pip install -e .
 ```
 
 `requirements.txt` remains available for lightweight bootstrap and CI-style installs.
+
+## Usage note
+
+- Hand `program.md` to a chat agent when you want the shortest possible entrypoint.
+- Use `prompts/pipeline.md` when you need the end-to-end workflow contract directly.
+- Use `tools/README.md` for the fully expanded `run_pipeline.py` CLI examples.

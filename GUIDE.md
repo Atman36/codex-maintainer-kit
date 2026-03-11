@@ -32,6 +32,8 @@ pip install -r requirements.txt
 
 ## Запуск
 
+Если нужен **один короткий entrypoint для агента**, начинай с `program.md`. Он сводит воедино: что читать первым, какой workflow считать основным и какие ограничения нельзя нарушать.
+
 ### Вариант 1 — Скилл `pr-factory-pipeline` (рекомендуется)
 
 Просто скажи агенту в Claude:
@@ -80,12 +82,11 @@ MAX_PRS      = 1
 ### Вариант 4 — Детерминированный запуск через CLI
 
 ```bash
-python tools/run_pipeline.py \
-  --repo-root /path/to/target/repo \
-  --mode full \
-  --base-branch main \
-  --artifact-dir analysis_report/
+python tools/run_pipeline.py --help
 ```
+
+Полный CLI-вызов с обязательными `--stage-command` смотри в `tools/README.md`.
+Короткий пример выше заменён намеренно: без `--stage-command` `run_pipeline.py` не запускается, и старый сниппет был некорректным.
 
 ---
 
@@ -270,6 +271,7 @@ BASE_BRANCH=main, MODE=full.
 
 ```
 pr-factory-kit/
+├── program.md            # Самый короткий entrypoint для агента
 ├── prompts/               # Промпты для каждого агента + user-шаблоны
 │   ├── user-pipeline-full.md    # Шаблон: полный запуск
 │   ├── user-analysis-only.md   # Шаблон: только анализ
