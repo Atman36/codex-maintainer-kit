@@ -339,10 +339,10 @@ Each stage must output valid JSON to stdout:
 ### Running Tests
 
 ```bash
-# Validate JSON schemas against saved example payloads
-python3 -m jsonschema schemas/execution_result.schema.json -i /path/to/execution-result.json
-python3 -m jsonschema schemas/prspec.schema.json -i /path/to/prspec.json
-python3 -m jsonschema schemas/pipeline_summary.schema.json -i /path/to/pipeline-summary.json
+# Validate JSON schemas
+python3 -m jsonschema schemas/execution_result.schema.json -i <(echo '{...}')
+python3 -m jsonschema schemas/prspec.schema.json -i <(echo '{...}')
+python3 -m jsonschema schemas/pipeline_summary.schema.json -i <(echo '{...}')
 # Run pipeline integration tests
 python3 -m unittest tools/tests/test_run_pipeline.py
 ```

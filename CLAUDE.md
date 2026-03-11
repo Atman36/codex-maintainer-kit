@@ -55,8 +55,3 @@ Unresolved placeholders cause fail-fast in `run_pipeline.py` (preflight check).
 `.github/workflows/` includes a workflow that runs:
 1. `pytest tools/tests/` — tool unit tests
 2. `python tools/validate_skills.py` — contract validation for all skills
-
-## Specs / Audit
-
-- Audit specs: `specs/audit-report-2026-03-11/` (all 17 done as of 2026-03-11)
-- Index: `specs/audit-report-2026-03-11/INDEX.md`
