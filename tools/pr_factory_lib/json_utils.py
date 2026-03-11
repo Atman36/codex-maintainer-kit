@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 
-_SAVED_JSON_PATH_RX = re.compile(r"SAVED_JSON_PATH\s*=\s*(\S+\.json)\b")
+_SAVED_JSON_PATH_RX = re.compile(r"^SAVED_JSON_PATH\s*=\s*(?P<value>.+?)\s*$")
 
 
 def write_json(path: Path, payload: Dict[str, Any]) -> None:
@@ -27,11 +27,20 @@ def parse_stage_output(stdout: str) -> Dict[str, Any]:
     try:
         return json.loads(text)
     except json.JSONDecodeError as exc:
-        path_match = _SAVED_JSON_PATH_RX.search(text)
-        if not path_match:
+        json_path: Path | None = None
+        for line in text.splitlines():
+            path_match = _SAVED_JSON_PATH_RX.match(line.strip())
+            if not path_match:
+                continue
+            raw_value = path_match.group("value").strip()
+            if len(raw_value) >= 2 and raw_value[0] == raw_value[-1] and raw_value[0] in {'"', "'"}:
+                raw_value = raw_value[1:-1]
+            json_path = Path(raw_value).expanduser()
+            break
+
+        if json_path is None:
             raise ValueError(f"Stage stdout is not valid JSON: {exc}") from exc
 
-        json_path = Path(path_match.group(1)).expanduser()
         if not json_path.is_file():
             raise ValueError(f"Stage reported SAVED_JSON_PATH but file does not exist: {json_path}") from exc
 
@@ -41,4 +50,3 @@ def parse_stage_output(stdout: str) -> Dict[str, Any]:
             raise ValueError(
                 f"Stage SAVED_JSON_PATH is not valid JSON ({json_path}): {file_exc}"
             ) from file_exc
-

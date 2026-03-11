@@ -235,14 +235,14 @@ def resolve_base_sha(
 ) -> Tuple[str, str]:
     refs = [f"origin/{base_branch}"]
     if allow_local_fallback:
-        refs.append(base_branch)
+        refs.extend([base_branch, "HEAD"])
     for ref in refs:
         proc = run_git(["rev-parse", "--verify", ref], cwd=repo_root)
         if proc.returncode == 0:
             return proc.stdout.strip(), ref
     if allow_local_fallback:
         raise ValueError(
-            f"Cannot resolve base SHA for '{base_branch}'. Tried origin/{base_branch} and local {base_branch}."
+            f"Cannot resolve base SHA for '{base_branch}'. Tried origin/{base_branch}, local {base_branch}, and HEAD."
         )
     raise ValueError(f"Cannot resolve base SHA for '{base_branch}'. Missing origin/{base_branch}.")
 
@@ -533,27 +533,71 @@ def run_preflight(
     ok("dirty_worktree", "Worktree policy satisfied")
 
     origin = run_git(["remote", "get-url", "origin"], cwd=repo_root)
-    if origin.returncode != 0:
-        fail(
-            "remotes",
-            "Missing required remote 'origin'.",
-            "Add upstream remote: `git remote add origin <url>`.",
+    has_origin = origin.returncode == 0
+    if publish_requested:
+        if not has_origin:
+            fail(
+                "remotes",
+                "Missing required remote 'origin'.",
+                "Add upstream remote: `git remote add origin <url>`.",
+            )
+            return PreflightResult(False, checks, errors, warnings, base_sha_at_start, runner_selected)
+        ok("remotes", f"origin={origin.stdout.strip()}")
+    elif has_origin:
+        ok("remotes", f"origin={origin.stdout.strip()}")
+    else:
+        warning = (
+            "Missing remote 'origin'; continuing with local-only preflight because publish mode is not requested."
         )
-        return PreflightResult(False, checks, errors, warnings, base_sha_at_start, runner_selected)
-    ok("remotes", f"origin={origin.stdout.strip()}")
+        warnings.append(warning)
+        checks.append(
+            PreflightCheck(
+                name="remotes",
+                status="warn",
+                detail=warning,
+                next_action="Add `origin` before using --publish.",
+            )
+        )
 
     try:
         base_sha_at_start, base_ref_used = resolve_base_sha(
             repo_root=repo_root,
             base_branch=base_branch,
-            allow_local_fallback=False,
+            allow_local_fallback=not publish_requested,
         )
-        ok("base_sha", f"base_sha_at_start={base_sha_at_start} ({base_ref_used})")
+        detail = f"base_sha_at_start={base_sha_at_start} ({base_ref_used})"
+        if publish_requested or base_ref_used == f"origin/{base_branch}":
+            ok("base_sha", detail)
+        else:
+            if base_ref_used == base_branch:
+                warning = (
+                    f"Preflight used local base branch '{base_branch}' because origin/{base_branch} was unavailable. "
+                    "Publish mode still requires the remote base."
+                )
+            else:
+                warning = (
+                    f"Preflight used HEAD because neither origin/{base_branch} nor local '{base_branch}' was "
+                    "available. Publish mode still requires the remote base."
+                )
+            warnings.append(warning)
+            checks.append(
+                PreflightCheck(
+                    name="base_sha",
+                    status="warn",
+                    detail=detail,
+                    next_action=f"Fetch or add origin/{base_branch} before using --publish.",
+                )
+            )
     except ValueError as exc:
+        next_action = f"Run `git fetch origin {base_branch}` and ensure the branch exists."
+        if not publish_requested:
+            next_action = (
+                f"Create or check out a local '{base_branch}' branch, or ensure HEAD resolves to a commit, then rerun."
+            )
         fail(
             "base_sha",
             str(exc),
-            f"Run `git fetch origin {base_branch}` and ensure the branch exists.",
+            next_action,
         )
         return PreflightResult(False, checks, errors, warnings, base_sha_at_start, runner_selected)
 

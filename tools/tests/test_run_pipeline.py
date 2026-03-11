@@ -68,6 +68,9 @@ class RunPipelineTests(unittest.TestCase):
     def tearDown(self):
         self.factory.cleanup()
 
+    def get_check(self, result, name):
+        return next(check for check in result.checks if check.name == name)
+
     def write_alias_stage_stub(self):
         stage_stub = self.factory.root / "alias_stage_stub.py"
         stage_stub.write_text(
@@ -328,7 +331,7 @@ class RunPipelineTests(unittest.TestCase):
         self.assertFalse(result.passed)
         self.assertEqual(result.checks[-1].name, "dirty_worktree")
 
-    def test_preflight_fails_without_origin_remote(self):
+    def test_preflight_allows_non_publish_without_origin_remote(self):
         repo = self.factory.create_repo(with_origin=False, push_origin=False, dirty=False)
         result = run_pipeline.run_preflight(
             repo_root=repo,
@@ -339,10 +342,13 @@ class RunPipelineTests(unittest.TestCase):
             required_stages=[],
             runner_selected="cli",
         )
-        self.assertFalse(result.passed)
-        self.assertEqual(result.checks[-1].name, "remotes")
+        self.assertTrue(result.passed)
+        self.assertEqual(self.get_check(result, "remotes").status, "warn")
+        self.assertEqual(self.get_check(result, "base_sha").status, "warn")
+        self.assertTrue(any("local-only preflight" in item for item in result.warnings))
+        self.assertTrue(any("local base branch 'main'" in item for item in result.warnings))
 
-    def test_preflight_fails_without_origin_base_sha(self):
+    def test_preflight_allows_local_base_branch_when_origin_base_missing(self):
         repo = self.factory.create_repo(with_origin=True, push_origin=False, dirty=False)
         result = run_pipeline.run_preflight(
             repo_root=repo,
@@ -353,8 +359,45 @@ class RunPipelineTests(unittest.TestCase):
             required_stages=[],
             runner_selected="cli",
         )
+        self.assertTrue(result.passed)
+        base_sha_check = self.get_check(result, "base_sha")
+        self.assertEqual(base_sha_check.status, "warn")
+        self.assertIn("(main)", base_sha_check.detail)
+        self.assertTrue(any("local base branch 'main'" in item for item in result.warnings))
+
+    def test_preflight_allows_head_fallback_for_non_publish(self):
+        repo = self.factory.create_repo(with_origin=False, push_origin=False, dirty=False)
+        run_cmd(["git", "checkout", "-b", "scratch"], cwd=repo)
+        run_cmd(["git", "branch", "-D", "main"], cwd=repo)
+
+        result = run_pipeline.run_preflight(
+            repo_root=repo,
+            base_branch="main",
+            allow_dirty=False,
+            publish_requested=False,
+            stage_commands={},
+            required_stages=[],
+            runner_selected="cli",
+        )
+        self.assertTrue(result.passed)
+        base_sha_check = self.get_check(result, "base_sha")
+        self.assertEqual(base_sha_check.status, "warn")
+        self.assertIn("(HEAD)", base_sha_check.detail)
+        self.assertTrue(any("used HEAD" in item for item in result.warnings))
+
+    def test_preflight_publish_requires_origin_remote(self):
+        repo = self.factory.create_repo(with_origin=False, push_origin=False, dirty=False)
+        result = run_pipeline.run_preflight(
+            repo_root=repo,
+            base_branch="main",
+            allow_dirty=False,
+            publish_requested=True,
+            stage_commands={},
+            required_stages=[],
+            runner_selected="cli",
+        )
         self.assertFalse(result.passed)
-        self.assertEqual(result.checks[-1].name, "base_sha")
+        self.assertEqual(result.checks[-1].name, "remotes")
 
     def test_preflight_publish_requires_gh(self):
         repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)

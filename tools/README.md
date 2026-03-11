@@ -153,13 +153,14 @@ Deterministic orchestrator for staged PR Factory execution.
 2. Supports runner adapters: `--runner auto|task|cli`.
 3. Enforces strict stage order by mode (`full`, `quick-win`, `architecture`).
 4. Executes analysis stages once, then runs implementation stages per PRSpec (multi-PR).
-5. Applies quality gates at each stage:
+5. For non-publish runs, resolves the base from `origin/<base>`, then local `<base>`, then `HEAD`, and warns when it falls back to a local-only base.
+6. Applies quality gates at each stage:
    - `critic` → must be `approve`
    - `gatekeeper` → must be `pr`
    - `implement`, `reviewer`, `pr_writer`, `publish` → must be `success`
-6. Self-healing loop for Implementer (default: up to 3 attempts).
-7. Writes machine-readable `pipeline-summary.json` and embeds structured error blocks.
-8. Supports legacy placeholder aliases and fails fast if any `{{PLACEHOLDER}}` remains unresolved after expansion.
+7. Self-healing loop for Implementer (default: up to 3 attempts).
+8. Writes machine-readable `pipeline-summary.json` and embeds structured error blocks.
+9. Supports legacy placeholder aliases and fails fast if any unresolved placeholder token remains after expansion.
 
 ### Pipeline Modes
 
@@ -318,6 +319,7 @@ Each stage must output valid JSON to stdout:
 | `Missing stage command(s)` | Not all required stage commands were provided | Add each missing `--stage-command stage=command` |
 | `Working tree is dirty` | Preflight clean-worktree policy | Commit/stash changes or rerun with `--allow-dirty` |
 | `Missing origin/<base>` | Base branch SHA cannot be resolved | `git fetch origin <base>` and rerun |
+| Local-only base fallback warning | Non-publish preflight could not use `origin/<base>` | Expected for offline/local analysis; fetch/add `origin` before publish |
 | Publish fails at preflight auth | `gh auth status` failed | Run `gh auth login` |
 | Publish blocked by base drift | Base changed during long run | Rebase/cherry-pick on latest `origin/<base>` and rerun publish |
 
