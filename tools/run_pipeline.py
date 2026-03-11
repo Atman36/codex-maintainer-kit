@@ -32,7 +32,7 @@ if str(TOOLS_DIR) not in sys.path:
 
 from pr_factory_lib.git_utils import run_git  # noqa: E402
 from pr_factory_lib.json_utils import parse_stage_output, write_json  # noqa: E402
-from pr_factory_lib.schema_utils import validate_stage_payload  # noqa: E402
+from pr_factory_lib.schema_utils import SchemaValidationError, validate_pipeline_summary, validate_stage_payload  # noqa: E402
 
 
 MODE_ANALYSIS_STAGE_ORDER: Dict[str, List[str]] = {
@@ -317,7 +317,12 @@ def collect_top_improvements(stage_payload: Dict[str, Any]) -> List[Dict[str, An
     if isinstance(data, dict):
         candidates = data.get("candidates")
         if isinstance(candidates, list):
-            return [c for c in candidates if isinstance(c, dict)]
+            normalized_candidates = [c for c in candidates if isinstance(c, dict)]
+            if normalized_candidates:
+                return normalized_candidates
+        candidate = data.get("candidate")
+        if isinstance(candidate, dict):
+            return [candidate]
     return []
 
 
@@ -1080,8 +1085,10 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
             stage_summaries.append(summary)
             analysis_stage_payloads[stage] = payload
 
-            if stage == "scout":
-                top_improvements = collect_top_improvements(payload)
+            if stage in {"scout", "architect"}:
+                collected_improvements = collect_top_improvements(payload)
+                if collected_improvements:
+                    top_improvements = collected_improvements
 
             gate_msg = gate_failed(stage, payload)
             if gate_msg:
@@ -1372,12 +1379,34 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
         if args.summary_output:
             summary_path = Path(args.summary_output).resolve()
         else:
-            default_summary_dir = Path.cwd() / "analysis_report"
-            if not default_summary_dir.exists():
-                default_summary_dir = Path.cwd()
-            summary_path = default_summary_dir / f"pipeline-summary-{pipeline_id}.json"
+            summary_path = default_artifact_dir(repo_root) / f"pipeline-summary-{pipeline_id}.json"
 
         summary_path_str = ""
+        try:
+            validate_pipeline_summary(summary_payload)
+        except SchemaValidationError as exc:
+            error = StructuredError(
+                reason=str(exc),
+                failed_stage="pipeline_summary",
+                next_action="Fix pipeline summary assembly before rerunning.",
+            )
+            error_blocks.append(error)
+            errors.append(error.as_text())
+            result = make_failure_result(
+                started_at=started_at,
+                mode=args.mode,
+                stage_summaries=stage_summaries,
+                top_improvements=top_improvements,
+                message="Pipeline summary validation failed",
+                errors=errors,
+                warnings=warnings,
+                error_blocks=error_blocks,
+                runner_selected=runner_adapter.name,
+                preflight_checks=preflight.checks,
+                pr_results=pr_results,
+                final_pr_spec=final_pr_spec if isinstance(final_pr_spec, dict) else None,
+            )
+            return 1, result
         try:
             summary_path.parent.mkdir(parents=True, exist_ok=True)
             write_json(summary_path, summary_payload)

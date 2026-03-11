@@ -52,6 +52,15 @@ def validate_stage_payload(payload: Dict[str, Any], expected_stage: str) -> None
         )
 
 
+def validate_pipeline_summary(payload: Dict[str, Any]) -> None:
+    _validate_instance(
+        schema_key="pipeline_summary",
+        schema_name="PipelineSummary",
+        instance=payload,
+        context="Pipeline summary",
+    )
+
+
 def _normalize_execution_result_stage(payload: Dict[str, Any], expected_stage: str) -> Dict[str, Any]:
     if not isinstance(payload, dict):
         return payload
@@ -165,16 +174,19 @@ def _load_validators() -> Dict[str, Any]:
 
     schema_dir = _schema_dir()
     execution_result_path = schema_dir / "execution_result.schema.json"
+    pipeline_summary_path = schema_dir / "pipeline_summary.schema.json"
     prspec_path = schema_dir / "prspec.schema.json"
 
     execution_result_schema = json.loads(execution_result_path.read_text(encoding="utf-8"))
+    pipeline_summary_schema = json.loads(pipeline_summary_path.read_text(encoding="utf-8"))
     prspec_schema = json.loads(prspec_path.read_text(encoding="utf-8"))
 
     store = {
         execution_result_path.resolve().as_uri(): execution_result_schema,
+        pipeline_summary_path.resolve().as_uri(): pipeline_summary_schema,
         prspec_path.resolve().as_uri(): prspec_schema,
     }
-    for schema in (execution_result_schema, prspec_schema):
+    for schema in (execution_result_schema, pipeline_summary_schema, prspec_schema):
         schema_id = schema.get("$id")
         if isinstance(schema_id, str) and schema_id:
             store[schema_id] = schema
@@ -196,6 +208,16 @@ def _load_validators() -> Dict[str, Any]:
             store=store,
         )
 
+    pipeline_summary_cls = validator_for(pipeline_summary_schema)
+    pipeline_summary_cls.check_schema(pipeline_summary_schema)
+    pipeline_summary_kwargs = {"format_checker": format_checker}
+    if resolver_cls is not None:
+        pipeline_summary_kwargs["resolver"] = resolver_cls(
+            base_uri=pipeline_summary_path.resolve().as_uri(),
+            referrer=pipeline_summary_schema,
+            store=store,
+        )
+
     prspec_cls = validator_for(prspec_schema)
     prspec_cls.check_schema(prspec_schema)
     prspec_kwargs = {"format_checker": format_checker}
@@ -208,5 +230,6 @@ def _load_validators() -> Dict[str, Any]:
 
     return {
         "execution_result": execution_result_cls(execution_result_schema, **execution_result_kwargs),
+        "pipeline_summary": pipeline_summary_cls(pipeline_summary_schema, **pipeline_summary_kwargs),
         "prspec": prspec_cls(prspec_schema, **prspec_kwargs),
     }

@@ -7,11 +7,17 @@ Commands run from repo root on 2026-03-11:
 - `python3 -m unittest tools.tests.test_contracts`
 - `python3 -m unittest tools.tests.test_run_pipeline.RunPipelineTests.test_default_artifact_dir_is_repo_relative`
 - `python3 -m unittest tools.tests.test_run_pipeline.RunPipelineTests.test_expand_template_accepts_artifact_dir_placeholder`
+- `. .venv/bin/activate && python3 -m unittest tools.tests.test_run_pipeline.RunPipelineTests.test_architecture_mode_surfaces_single_candidate_in_top_improvements`
+- `. .venv/bin/activate && python3 -m unittest tools.tests.test_run_pipeline.RunPipelineTests.test_pipeline_summary_payload_is_validated`
+- `. .venv/bin/activate && python3 -m unittest tools.tests.test_run_pipeline.RunPipelineTests.test_default_summary_output_uses_stable_artifact_dir`
 - `python3 -m unittest tools.tests.test_contracts.ContractRegistryTests.test_root_docs_are_scanned_for_unknown_placeholders`
 - `. .venv/bin/activate && python -m unittest discover -s tools/tests -p 'test_*.py'`
 - `rg -n "/Users/Apple/Developer/pr-factory-kit/analysis_report/" skills prompts README.md AGENTS.md tools specs FRAMEWORK_IMPROVEMENTS_2026-03-11.md`
 - `rg -n "low-risk|approve|scope minimization|strategic" prompts/agent-critic.md skills/pr-factory-critic/SKILL.md prompts/gatekeeper.md skills/pr-factory-gatekeeper/SKILL.md`
 - targeted source checks against `tools/run_pipeline.py`, `tools/contract_registry.py`, `README.md`
+
+Note:
+- Bare system `python3` on this machine currently does not have `jsonschema`; the new summary-validation tests were verified in `.venv`.
 
 Confirmed done:
 - Repository-level skill validation is green on the current checkout.
@@ -19,8 +25,8 @@ Confirmed done:
 - Metadata `*_JSON` path-vs-object contract drift is no longer present in scanned PR Factory skills.
 
 Confirmed still open:
-- `collect_top_improvements()` still ignores `data.candidate`, so architecture mode can still lose its primary signal.
-- Pipeline summary artifacts still default outside the new analysis artifact placeholder contract.
+- Optional packaging follow-up: `pyproject.toml` / editable install support.
+- Optional feature follow-ups: run ID lineage and pipeline mode config extraction.
 
 ## Done
 
@@ -37,11 +43,11 @@ Confirmed still open:
 - Replaced hardcoded analysis artifact paths in prompts/skills/docs with portable `{{ARTIFACT_DIR}}` guidance and documented the repo-relative `analysis_report/` default.
 - Added runner support for `ARTIFACT_DIR` placeholder expansion with a deterministic repo-relative default.
 - Rebalanced Critic/Gatekeeper prompt policy so narrow docs/tests/DX/bugfix work has an explicit fast-approve path and Gatekeeper focuses on post-approval scope shaping.
+- Preserved architect-mode `data.candidate` payloads in `top_improvements` and added an architecture-mode regression test.
+- Added runtime `PipelineSummary` validation before write and moved the default summary artifact path into the stable repo-owned `analysis_report/` directory.
 
 ## Remaining
 
-- Preserve architect `data.candidate` in `top_improvements`.
-- Stabilize pipeline summary output into the repo-owned artifact contract.
 - Optional packaging follow-up: `pyproject.toml` / editable install support.
 - Optional feature follow-ups: run ID lineage and pipeline mode config extraction.
 

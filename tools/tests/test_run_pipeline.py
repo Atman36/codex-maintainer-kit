@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import os
 import shlex
 import subprocess
 import sys
@@ -7,6 +8,7 @@ import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 def load_run_pipeline_module():
@@ -214,6 +216,116 @@ class RunPipelineTests(unittest.TestCase):
 
         self.assertEqual(expanded, "save /tmp/example/analysis_report/critic.json")
 
+    def test_architecture_mode_surfaces_single_candidate_in_top_improvements(self):
+        repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)
+        stage_stub = self.write_stage_stub(
+            "architecture_single_candidate_stub.py",
+            """
+            import json
+            import sys
+            from pathlib import Path
+
+            TS = "2026-01-01T00:00:00Z"
+
+            def emit(stage, status="success", data=None, pr_spec=None):
+                payload = {
+                    "schema_version": "1.0",
+                    "id": f"{stage}-id",
+                    "stage": stage,
+                    "status": status,
+                    "summary": "ok",
+                    "started_at": TS,
+                    "finished_at": TS,
+                    "exit_code": 0,
+                    "stdout": "",
+                    "stderr": "",
+                    "artifacts": [],
+                    "metrics": {
+                        "duration_ms": 1,
+                        "cost_usd": 0.0,
+                        "tokens_in": 0,
+                        "tokens_out": 0,
+                    },
+                    "errors": [],
+                    "warnings": [],
+                    "data": data or {},
+                }
+                if pr_spec is not None:
+                    payload["pr_spec"] = pr_spec
+                print(json.dumps(payload))
+
+            def make_pr_spec(candidate_id):
+                return {
+                    "schema_version": "1.0",
+                    "id": f"prspec-{candidate_id}",
+                    "repo": {"url": "https://example.com/repo", "owner": "o", "name": "n", "default_branch": "main"},
+                    "base": {"branch": "main"},
+                    "head": {"branch": f"feature/{candidate_id}"},
+                    "title": "Architect summary regression",
+                    "body_markdown": "## What\\nArchitect\\n\\n## Why\\nRegression coverage\\n\\n## How to verify\\n```bash\\npython3 -m unittest tools.tests.test_run_pipeline.RunPipelineTests.test_architecture_mode_surfaces_single_candidate_in_top_improvements\\n```",
+                    "change_type": "test",
+                    "risk": "low",
+                    "files_touched": ["README.md"],
+                    "test_plan": ["python3 -m unittest tools.tests.test_run_pipeline.RunPipelineTests.test_architecture_mode_surfaces_single_candidate_in_top_improvements"],
+                    "ai_assistance": {"used": True, "tools": [{"name": "codex", "role": "test"}], "disclosure_line": "AI assisted"},
+                }
+
+            stage = sys.argv[1]
+            if stage == "architect":
+                emit("architect", data={"candidate": {"id": "cand-architect", "title": "Architect improvement"}})
+            elif stage == "critic":
+                emit("critic", data={"decision": "approve"})
+            elif stage == "gatekeeper":
+                source = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+                candidate = source["data"].get("candidate") or source["data"]["candidates"][0]
+                pr_spec = make_pr_spec(candidate["id"])
+                emit(
+                    "gatekeeper",
+                    data={"selected": [{"candidate_id": candidate["id"], "decision": "pr"}], "pr_specs": [pr_spec]},
+                    pr_spec=pr_spec,
+                )
+            elif stage == "implement":
+                pr_spec = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+                emit("implement", data={"implemented": pr_spec["id"]})
+            elif stage == "reviewer":
+                emit("reviewer", data={"reviewed": "ok"})
+            elif stage == "pr_writer":
+                pr_spec = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+                emit("pr_writer", pr_spec=pr_spec)
+            else:
+                raise SystemExit(f"unknown stage: {stage}")
+            """,
+        )
+
+        py = shlex.quote(str(stage_stub))
+        args = run_pipeline.parse_args(
+            [
+                "--repo-root",
+                str(repo),
+                "--mode",
+                "architecture",
+                "--runner",
+                "cli",
+                "--stage-command",
+                f"architect=python3 {py} architect",
+                "--stage-command",
+                f"critic=python3 {py} critic",
+                "--stage-command",
+                f"gatekeeper=python3 {py} gatekeeper {{{{ARCHITECT_JSON}}}}",
+                "--stage-command",
+                f"implement=python3 {py} implement {{{{PRSPEC_JSON}}}}",
+                "--stage-command",
+                f"reviewer=python3 {py} reviewer {{{{IMPLEMENT_RESULT_JSON}}}}",
+                "--stage-command",
+                f"pr_writer=python3 {py} pr_writer {{{{PRSPEC_JSON}}}}",
+            ]
+        )
+
+        exit_code, payload = run_pipeline.run_pipeline(args)
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(payload["data"]["top_improvements"], [{"id": "cand-architect", "title": "Architect improvement"}])
+
     def run_alias_pipeline(self, mode):
         repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)
         stage_stub = self.write_alias_stage_stub()
@@ -272,6 +384,86 @@ class RunPipelineTests(unittest.TestCase):
             ]
         )
         return run_pipeline.run_pipeline(args)
+
+    def test_default_summary_output_uses_stable_artifact_dir(self):
+        repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)
+        stage_stub = self.write_alias_stage_stub()
+        py = shlex.quote(str(stage_stub))
+        args = run_pipeline.parse_args(
+            [
+                "--repo-root",
+                str(repo),
+                "--mode",
+                "quick-win",
+                "--runner",
+                "cli",
+                "--stage-command",
+                f"scout=python3 {py} scout",
+                "--stage-command",
+                f"gatekeeper=python3 {py} gatekeeper {{{{CANDIDATES_JSON}}}}",
+                "--stage-command",
+                f"implement=python3 {py} implement {{{{PRSPEC_JSON}}}}",
+                "--stage-command",
+                f"reviewer=python3 {py} reviewer {{{{IMPLEMENT_RESULT_JSON}}}}",
+                "--stage-command",
+                f"pr_writer=python3 {py} pr_writer {{{{PRSPEC_JSON}}}}",
+            ]
+        )
+
+        original_cwd = Path.cwd()
+        caller_cwd = self.factory.root / "caller-cwd"
+        caller_cwd.mkdir(parents=True, exist_ok=True)
+        os.chdir(caller_cwd)
+        try:
+            exit_code, payload = run_pipeline.run_pipeline(args)
+        finally:
+            os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        summary_path = Path(payload["data"]["pipeline_summary_path"]).resolve()
+        self.assertEqual(summary_path.parent, run_pipeline.default_artifact_dir(repo).resolve())
+        self.assertTrue(summary_path.exists())
+        self.assertNotEqual(summary_path.parent, (caller_cwd / "analysis_report").resolve())
+
+    def test_pipeline_summary_payload_is_validated(self):
+        repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)
+        stage_stub = self.write_alias_stage_stub()
+        py = shlex.quote(str(stage_stub))
+        summary_output = self.factory.root / "invalid-summary-should-not-exist.json"
+        args = run_pipeline.parse_args(
+            [
+                "--repo-root",
+                str(repo),
+                "--mode",
+                "quick-win",
+                "--runner",
+                "cli",
+                "--summary-output",
+                str(summary_output),
+                "--stage-command",
+                f"scout=python3 {py} scout",
+                "--stage-command",
+                f"gatekeeper=python3 {py} gatekeeper {{{{CANDIDATES_JSON}}}}",
+                "--stage-command",
+                f"implement=python3 {py} implement {{{{PRSPEC_JSON}}}}",
+                "--stage-command",
+                f"reviewer=python3 {py} reviewer {{{{IMPLEMENT_RESULT_JSON}}}}",
+                "--stage-command",
+                f"pr_writer=python3 {py} pr_writer {{{{PRSPEC_JSON}}}}",
+            ]
+        )
+
+        class BrokenRunner(run_pipeline.CliRunnerAdapter):
+            name = "broken"
+
+        with mock.patch.object(run_pipeline, "select_runner", return_value=(BrokenRunner(), [])):
+            exit_code, payload = run_pipeline.run_pipeline(args)
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(payload["status"], "needs_human")
+        self.assertEqual(payload["summary"], "Pipeline summary validation failed")
+        self.assertIn("PipelineSummary validation", payload["stderr"])
+        self.assertFalse(summary_output.exists())
 
     def run_quick_win_pipeline_with_stub(self, repo, stage_stub):
         py = shlex.quote(str(stage_stub))
