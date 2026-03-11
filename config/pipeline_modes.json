@@ -1,0 +1,8 @@
+{
+  "schema_version": "1.0",
+  "analysis_stage_order": {
+    "architecture": ["architect", "critic", "gatekeeper"],
+    "full": ["scout", "analyst", "critic", "gatekeeper"],
+    "quick-win": ["scout", "gatekeeper"]
+  }
+}

@@ -19,7 +19,9 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
@@ -35,18 +37,19 @@ from pr_factory_lib.json_utils import parse_stage_output, write_json  # noqa: E4
 from pr_factory_lib.schema_utils import SchemaValidationError, validate_pipeline_summary, validate_stage_payload  # noqa: E402
 
 
-MODE_ANALYSIS_STAGE_ORDER: Dict[str, List[str]] = {
-    "full": ["scout", "analyst", "critic", "gatekeeper"],
-    "quick-win": ["scout", "gatekeeper"],
-    "architecture": ["architect", "critic", "gatekeeper"],
-}
-
 IMPLEMENTATION_STAGES: List[str] = ["implement", "reviewer", "pr_writer"]
+DEFAULT_PIPELINE_MODES_CONFIG_PATH = TOOLS_DIR.parent / "config" / "pipeline_modes.json"
+REQUIRED_PIPELINE_MODES: Tuple[str, ...] = ("full", "quick-win", "architecture")
+ALLOWED_ANALYSIS_STAGES = frozenset({"scout", "analyst", "architect", "critic", "gatekeeper"})
 PLACEHOLDER_ALIAS_PREFERENCES: Dict[str, Tuple[str, ...]] = {
     "CANDIDATES_JSON": ("ANALYST_JSON", "ARCHITECT_JSON", "SCOUT_JSON"),
     "IMPLEMENT_RESULT_JSON": ("IMPLEMENT_JSON",),
 }
 UNRESOLVED_PLACEHOLDER_RX = re.compile(r"\{\{([^{}]+)\}\}")
+
+
+class PipelineModeConfigError(ValueError):
+    pass
 
 
 @dataclass
@@ -146,6 +149,71 @@ class TaskRunnerAdapter(RunnerAdapter):
 
 def utc_now() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat()
+
+
+def new_run_id() -> str:
+    return str(uuid.uuid4())
+
+
+def pipeline_id_for_run(run_id: str) -> str:
+    return f"pipeline-{run_id}"
+
+
+def run_artifact_dir(repo_root: Path, run_id: str) -> Path:
+    return default_artifact_dir(repo_root) / "runs" / run_id
+
+
+@lru_cache(maxsize=None)
+def _load_pipeline_mode_analysis_stage_order(config_path_str: str) -> Dict[str, List[str]]:
+    config_path = Path(config_path_str)
+    if not config_path.exists():
+        raise PipelineModeConfigError(f"Pipeline mode config is missing: {config_path}")
+
+    try:
+        payload = json.loads(config_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise PipelineModeConfigError(f"Pipeline mode config is not valid JSON: {config_path} ({exc})") from exc
+
+    if not isinstance(payload, dict):
+        raise PipelineModeConfigError(f"Pipeline mode config must be a JSON object: {config_path}")
+
+    analysis_stage_order = payload.get("analysis_stage_order")
+    if not isinstance(analysis_stage_order, dict):
+        raise PipelineModeConfigError(
+            f"Pipeline mode config must define object field 'analysis_stage_order': {config_path}"
+        )
+
+    loaded: Dict[str, List[str]] = {}
+    for mode, stages in analysis_stage_order.items():
+        if not isinstance(mode, str) or not mode.strip():
+            raise PipelineModeConfigError(
+                f"Pipeline mode config contains an empty mode name in 'analysis_stage_order': {config_path}"
+            )
+        if not isinstance(stages, list) or not stages or not all(isinstance(stage, str) and stage.strip() for stage in stages):
+            raise PipelineModeConfigError(
+                f"Pipeline mode config mode '{mode}' must be a non-empty array of stage names: {config_path}"
+            )
+        unknown_stages = sorted({stage for stage in stages if stage not in ALLOWED_ANALYSIS_STAGES})
+        if unknown_stages:
+            allowed_text = ", ".join(sorted(ALLOWED_ANALYSIS_STAGES))
+            unknown_text = ", ".join(unknown_stages)
+            raise PipelineModeConfigError(
+                f"Pipeline mode config mode '{mode}' contains unknown stage(s): {unknown_text}. "
+                f"Allowed analysis stages: {allowed_text}."
+            )
+        loaded[mode] = list(stages)
+
+    missing_modes = [mode for mode in REQUIRED_PIPELINE_MODES if mode not in loaded]
+    if missing_modes:
+        raise PipelineModeConfigError(
+            "Pipeline mode config is missing required mode(s): " + ", ".join(missing_modes)
+        )
+    return loaded
+
+
+def load_pipeline_mode_analysis_stage_order(config_path: Optional[Path] = None) -> Dict[str, List[str]]:
+    resolved_path = (config_path or DEFAULT_PIPELINE_MODES_CONFIG_PATH).resolve()
+    return _load_pipeline_mode_analysis_stage_order(str(resolved_path))
 
 
 def parse_stage_commands(items: List[str]) -> Dict[str, str]:
@@ -364,6 +432,35 @@ def slugify(value: str) -> str:
 
 def default_artifact_dir(repo_root: Path) -> Path:
     return repo_root / "analysis_report"
+
+
+def persist_stage_payload(
+    payload: Dict[str, Any],
+    *,
+    path: Path,
+    run_id: str,
+    artifact_root: Path,
+    lineage: Dict[str, Any],
+) -> Dict[str, Any]:
+    persisted_payload = json.loads(json.dumps(payload))
+    data = persisted_payload.get("data")
+    if not isinstance(data, dict):
+        data = {}
+        persisted_payload["data"] = data
+
+    payload_lineage = data.get("lineage")
+    if not isinstance(payload_lineage, dict):
+        payload_lineage = {}
+
+    payload_lineage.update(lineage)
+    payload_lineage["artifact_root"] = str(artifact_root)
+    payload_lineage["stage_payload_path"] = str(path)
+    data["lineage"] = payload_lineage
+    data["run_id"] = run_id
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_json(path, persisted_payload)
+    return persisted_payload
 
 
 def normalize_head_branch(pr_spec: Dict[str, Any], index: int) -> str:
@@ -783,6 +880,7 @@ def execute_stage_with_retries(
 def make_failure_result(
     started_at: str,
     mode: str,
+    run_id: str,
     stage_summaries: List[Dict[str, Any]],
     top_improvements: List[Dict[str, Any]],
     message: str,
@@ -793,10 +891,13 @@ def make_failure_result(
     preflight_checks: List[PreflightCheck],
     pr_results: Optional[List[Dict[str, Any]]] = None,
     summary_path: str = "",
+    lineage: Optional[Dict[str, Any]] = None,
     final_pr_spec: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     pr_results = pr_results or []
     first_pr_spec = final_pr_spec or {}
+    pipeline_id = pipeline_id_for_run(run_id)
+    lineage = lineage or {}
 
     final_pr_message: Dict[str, Any] = {}
     if isinstance(first_pr_spec, dict):
@@ -807,7 +908,7 @@ def make_failure_result(
 
     return {
         "schema_version": "1.0",
-        "id": f"pipeline-{int(time.time())}",
+        "id": pipeline_id,
         "stage": "pipeline",
         "status": "needs_human",
         "summary": message,
@@ -828,6 +929,7 @@ def make_failure_result(
         "warnings": warnings,
         "data": {
             "pipeline_mode": mode,
+            "run_id": run_id,
             "runner_selected": runner_selected,
             "stage_summary": stage_summaries,
             "top_improvements": top_improvements,
@@ -847,6 +949,7 @@ def make_failure_result(
                 ]
             },
             "error_blocks": [e.as_dict() for e in error_blocks],
+            "lineage": lineage,
             "pipeline_summary_path": summary_path,
         },
         "pr_spec": first_pr_spec if isinstance(first_pr_spec, dict) else {},
@@ -860,7 +963,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--base-branch", default="main", help="Base branch.")
     parser.add_argument("--context-path", default="", help="Optional context path.")
     parser.add_argument("--focus", default="", help="Optional focus value for Analyst.")
-    parser.add_argument("--mode", choices=sorted(MODE_ANALYSIS_STAGE_ORDER.keys()), default="full")
+    parser.add_argument("--mode", default="full", help="Pipeline mode defined in config/pipeline_modes.json.")
     parser.add_argument("--max-prs", type=int, default=1)
     parser.add_argument("--publish", action="store_true", help="Append publish stage.")
     parser.add_argument(
@@ -909,6 +1012,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 
 def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
     started_at = utc_now()
+    run_id = new_run_id()
     repo_root = Path(args.repo_root).resolve()
 
     try:
@@ -917,6 +1021,7 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
         result = make_failure_result(
             started_at=started_at,
             mode=args.mode,
+            run_id=run_id,
             stage_summaries=[],
             top_improvements=[],
             message=f"Invalid stage command: {exc}",
@@ -928,7 +1033,52 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
         )
         return 1, result
 
-    required_stages = MODE_ANALYSIS_STAGE_ORDER[args.mode] + IMPLEMENTATION_STAGES
+    try:
+        mode_analysis_stage_order = load_pipeline_mode_analysis_stage_order()
+    except PipelineModeConfigError as exc:
+        error = StructuredError(
+            reason=str(exc),
+            failed_stage="pipeline_mode_config",
+            next_action="Restore/fix config/pipeline_modes.json and rerun.",
+        )
+        result = make_failure_result(
+            started_at=started_at,
+            mode=args.mode,
+            run_id=run_id,
+            stage_summaries=[],
+            top_improvements=[],
+            message="Pipeline mode config failed validation",
+            errors=[error.as_text()],
+            warnings=[],
+            error_blocks=[error],
+            runner_selected="",
+            preflight_checks=[],
+        )
+        return 1, result
+
+    if args.mode not in mode_analysis_stage_order:
+        error = StructuredError(
+            reason=f"Unknown pipeline mode '{args.mode}'. Available modes: {', '.join(sorted(mode_analysis_stage_order))}",
+            failed_stage="pipeline_mode_config",
+            next_action="Pick a configured mode or update config/pipeline_modes.json.",
+        )
+        result = make_failure_result(
+            started_at=started_at,
+            mode=args.mode,
+            run_id=run_id,
+            stage_summaries=[],
+            top_improvements=[],
+            message="Requested pipeline mode is not configured",
+            errors=[error.as_text()],
+            warnings=[],
+            error_blocks=[error],
+            runner_selected="",
+            preflight_checks=[],
+        )
+        return 1, result
+
+    analysis_stage_order = mode_analysis_stage_order[args.mode]
+    required_stages = analysis_stage_order + IMPLEMENTATION_STAGES
     if args.publish:
         required_stages.append("publish")
 
@@ -943,6 +1093,7 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
         result = make_failure_result(
             started_at=started_at,
             mode=args.mode,
+            run_id=run_id,
             stage_summaries=[],
             top_improvements=[],
             message="Runner selection failed",
@@ -995,6 +1146,7 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
         result = make_failure_result(
             started_at=started_at,
             mode=args.mode,
+            run_id=run_id,
             stage_summaries=stage_summaries,
             top_improvements=top_improvements,
             message="Preflight failed. See next_action for recovery steps.",
@@ -1007,6 +1159,11 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
         return 1, result
 
     analysis_stage_payloads: Dict[str, Dict[str, Any]] = {}
+    analysis_stage_paths: Dict[str, str] = {}
+    analysis_stage_lineage: List[Dict[str, Any]] = []
+    pr_spec_lineage: List[Dict[str, Any]] = []
+    pr_stage_lineage: List[Dict[str, Any]] = []
+    artifact_root = run_artifact_dir(repo_root, run_id)
 
     with tempfile.TemporaryDirectory(prefix="pr-factory-") as tmp_dir:
         tmp = Path(tmp_dir)
@@ -1023,11 +1180,9 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
         }
 
         # Analysis path executes once.
-        for stage in MODE_ANALYSIS_STAGE_ORDER[args.mode]:
-            for previous_stage, payload in analysis_stage_payloads.items():
-                path = tmp / f"{previous_stage}.json"
-                write_json(path, payload)
-                template_values[f"{previous_stage.upper()}_JSON"] = str(path)
+        for stage in analysis_stage_order:
+            for previous_stage, path in analysis_stage_paths.items():
+                template_values[f"{previous_stage.upper()}_JSON"] = path
 
             run_result, attempts, retry_trace = execute_stage_with_retries(
                 adapter=runner_adapter,
@@ -1050,7 +1205,7 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
                 "attempts": attempts,
                 "status": "",
                 "retry_trace": retry_trace,
-            }
+                }
 
             if run_result.exit_code != 0:
                 reason = run_result.stderr.strip() or run_result.stdout.strip() or f"Stage {stage} failed"
@@ -1077,13 +1232,23 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
                 stage_summaries.append(summary)
                 break
 
-            payload = run_result.payload
+            payload_path = artifact_root / "analysis" / f"{stage}.json"
+            payload = persist_stage_payload(
+                run_result.payload,
+                path=payload_path,
+                run_id=run_id,
+                artifact_root=artifact_root,
+                lineage={"stage": stage, "pipeline_mode": args.mode},
+            )
             if stage == "critic":
                 summary["status"] = critic_decision(payload)
             else:
                 summary["status"] = stage_status(payload)
+            summary["payload_path"] = str(payload_path)
             stage_summaries.append(summary)
             analysis_stage_payloads[stage] = payload
+            analysis_stage_paths[stage] = str(payload_path)
+            analysis_stage_lineage.append({"stage": stage, "path": str(payload_path)})
 
             if stage in {"scout", "architect"}:
                 collected_improvements = collect_top_improvements(payload)
@@ -1133,10 +1298,17 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
                     pr_retry_trace: List[Dict[str, Any]] = []
                     base_sha_at_publish = ""
 
-                    pr_dir = tmp / f"pr-{index}"
+                    pr_dir = artifact_root / "prs" / f"pr-{index}"
                     pr_dir.mkdir(parents=True, exist_ok=True)
                     prspec_path = pr_dir / "prspec.json"
                     write_json(prspec_path, normalized_pr_spec)
+                    pr_spec_lineage.append(
+                        {
+                            "index": index,
+                            "id": normalized_pr_spec.get("id", f"prspec-{index}"),
+                            "path": str(prspec_path),
+                        }
+                    )
 
                     per_pr_template_values = dict(template_values)
                     per_pr_template_values.update(
@@ -1155,14 +1327,24 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
                         pr_stage_order.append("publish")
 
                     for stage in pr_stage_order:
-                        for previous_stage, payload in analysis_stage_payloads.items():
-                            path = pr_dir / f"analysis-{previous_stage}.json"
-                            write_json(path, payload)
-                            per_pr_template_values[f"{previous_stage.upper()}_JSON"] = str(path)
+                        for previous_stage, path in analysis_stage_paths.items():
+                            per_pr_template_values[f"{previous_stage.upper()}_JSON"] = path
 
                         for previous_stage, payload in pr_stage_payloads.items():
                             path = pr_dir / f"{previous_stage}.json"
-                            write_json(path, payload)
+                            persisted_payload = persist_stage_payload(
+                                payload,
+                                path=path,
+                                run_id=run_id,
+                                artifact_root=artifact_root,
+                                lineage={
+                                    "stage": previous_stage,
+                                    "pipeline_mode": args.mode,
+                                    "pr_index": index,
+                                    "prspec_path": str(prspec_path),
+                                },
+                            )
+                            pr_stage_payloads[previous_stage] = persisted_payload
                             per_pr_template_values[f"{previous_stage.upper()}_JSON"] = str(path)
 
                         if stage == "publish":
@@ -1252,10 +1434,24 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
                             pr_stage_summaries.append(stage_summary)
                             break
 
-                        payload = run_result.payload
+                        payload_path = pr_dir / f"{stage}.json"
+                        payload = persist_stage_payload(
+                            run_result.payload,
+                            path=payload_path,
+                            run_id=run_id,
+                            artifact_root=artifact_root,
+                            lineage={
+                                "stage": stage,
+                                "pipeline_mode": args.mode,
+                                "pr_index": index,
+                                "prspec_path": str(prspec_path),
+                            },
+                        )
                         stage_summary["status"] = stage_status(payload)
+                        stage_summary["payload_path"] = str(payload_path)
                         pr_stage_summaries.append(stage_summary)
                         pr_stage_payloads[stage] = payload
+                        pr_stage_lineage.append({"index": index, "stage": stage, "path": str(payload_path)})
 
                         gate_msg = gate_failed(stage, payload)
                         if gate_msg:
@@ -1315,6 +1511,10 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
                                 "requested": bool(args.publish),
                                 "url": pr_url,
                             },
+                            "lineage": {
+                                "prspec_path": str(prspec_path),
+                                "stage_payloads": [item for item in pr_stage_lineage if item.get("index") == index],
+                            },
                             "base_sha_at_start": preflight.base_sha_at_start,
                             "base_sha_at_publish": base_sha_at_publish,
                         }
@@ -1333,14 +1533,28 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
         if errors:
             summary = "Stopped pipeline with one or more recoverable failures."
 
-        pipeline_id = f"pipeline-{int(time.time())}"
+        pipeline_id = pipeline_id_for_run(run_id)
+        if args.summary_output:
+            summary_path = Path(args.summary_output).resolve()
+        else:
+            summary_path = default_artifact_dir(repo_root) / f"pipeline-summary-{pipeline_id}.json"
+
+        lineage = {
+            "artifact_root": str(artifact_root),
+            "summary_path": str(summary_path),
+            "analysis_stage_payloads": analysis_stage_lineage,
+            "pr_specs": pr_spec_lineage,
+            "pr_stage_payloads": pr_stage_lineage,
+        }
         summary_payload = {
             "schema_version": "1.0",
             "id": pipeline_id,
+            "run_id": run_id,
             "generated_at": utc_now(),
             "pipeline_mode": args.mode,
             "runner_selected": runner_adapter.name,
             "status": status,
+            "lineage": lineage,
             "preflight": {
                 "passed": preflight.passed,
                 "base_sha_at_start": preflight.base_sha_at_start,
@@ -1376,11 +1590,6 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
             "warnings": warnings,
         }
 
-        if args.summary_output:
-            summary_path = Path(args.summary_output).resolve()
-        else:
-            summary_path = default_artifact_dir(repo_root) / f"pipeline-summary-{pipeline_id}.json"
-
         summary_path_str = ""
         try:
             validate_pipeline_summary(summary_payload)
@@ -1395,6 +1604,7 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
             result = make_failure_result(
                 started_at=started_at,
                 mode=args.mode,
+                run_id=run_id,
                 stage_summaries=stage_summaries,
                 top_improvements=top_improvements,
                 message="Pipeline summary validation failed",
@@ -1404,6 +1614,8 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
                 runner_selected=runner_adapter.name,
                 preflight_checks=preflight.checks,
                 pr_results=pr_results,
+                summary_path=str(summary_path),
+                lineage=lineage,
                 final_pr_spec=final_pr_spec if isinstance(final_pr_spec, dict) else None,
             )
             return 1, result
@@ -1444,6 +1656,7 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
             "warnings": warnings,
             "data": {
                 "pipeline_mode": args.mode,
+                "run_id": run_id,
                 "runner_selected": runner_adapter.name,
                 "stage_summary": stage_summaries,
                 "top_improvements": top_improvements,
@@ -1464,6 +1677,7 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
                     "base_sha_at_start": preflight.base_sha_at_start,
                 },
                 "error_blocks": [e.as_dict() for e in error_blocks],
+                "lineage": {**lineage, "summary_path": summary_path_str or lineage["summary_path"]},
                 "pipeline_summary_path": summary_path_str,
             },
             "pr_spec": final_pr_spec if isinstance(final_pr_spec, dict) else {},

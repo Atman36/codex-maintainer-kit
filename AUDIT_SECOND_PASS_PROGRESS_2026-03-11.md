@@ -12,21 +12,25 @@ Commands run from repo root on 2026-03-11:
 - `. .venv/bin/activate && python3 -m unittest tools.tests.test_run_pipeline.RunPipelineTests.test_default_summary_output_uses_stable_artifact_dir`
 - `python3 -m unittest tools.tests.test_contracts.ContractRegistryTests.test_root_docs_are_scanned_for_unknown_placeholders`
 - `. .venv/bin/activate && python -m unittest discover -s tools/tests -p 'test_*.py'`
+- `python3 -m unittest tools.tests.test_run_pipeline`
+- `python3 -m unittest discover -s tools/tests -p 'test_*.py'`
 - `rg -n "/Users/Apple/Developer/pr-factory-kit/analysis_report/" skills prompts README.md AGENTS.md tools specs FRAMEWORK_IMPROVEMENTS_2026-03-11.md`
 - `rg -n "low-risk|approve|scope minimization|strategic" prompts/agent-critic.md skills/pr-factory-critic/SKILL.md prompts/gatekeeper.md skills/pr-factory-gatekeeper/SKILL.md`
 - targeted source checks against `tools/run_pipeline.py`, `tools/contract_registry.py`, `README.md`
 
 Note:
-- Bare system `python3` on this machine currently does not have `jsonschema`; the new summary-validation tests were verified in `.venv`.
+- `jsonschema` is now installed for the current system `python3`, so the exact runner verification commands pass both bare and in `.venv`.
 
 Confirmed done:
 - Repository-level skill validation is green on the current checkout.
 - Contract registry tests pass on the current checkout.
 - Metadata `*_JSON` path-vs-object contract drift is no longer present in scanned PR Factory skills.
+- Editable-install packaging metadata is now present via `pyproject.toml` with minimal setuptools config for `tools/pr_factory_lib`.
+- Pipeline runs now emit a first-class `run_id` and persist machine-readable lineage for stage payloads and extracted PRSpecs.
+- Pipeline mode analysis graphs now load from `config/pipeline_modes.json` with early validation for missing or invalid config.
 
 Confirmed still open:
-- Optional packaging follow-up: `pyproject.toml` / editable install support.
-- Optional feature follow-ups: run ID lineage and pipeline mode config extraction.
+- Optional packaging follow-up: broader editable-install follow-through and repo packaging cleanup beyond the minimal `pyproject.toml`.
 
 ## Done
 
@@ -45,11 +49,15 @@ Confirmed still open:
 - Rebalanced Critic/Gatekeeper prompt policy so narrow docs/tests/DX/bugfix work has an explicit fast-approve path and Gatekeeper focuses on post-approval scope shaping.
 - Preserved architect-mode `data.candidate` payloads in `top_improvements` and added an architecture-mode regression test.
 - Added runtime `PipelineSummary` validation before write and moved the default summary artifact path into the stable repo-owned `analysis_report/` directory.
+- Added minimal `pyproject.toml` packaging metadata so `python3 -m pip install -e .` works without restructuring the repo, while keeping `requirements.txt` in place.
+- Documented editable-install setup in the root `README.md`.
+- Added config-backed pipeline mode loading from `config/pipeline_modes.json`, with early validation for required modes and stage names.
+- Added per-run `run_id`, stable run artifact directories, and lineage fields connecting pipeline summaries to persisted analysis payloads, PR specs, and per-PR stage outputs.
+- Extended the pipeline summary schema and runner regression coverage for config loading and shared `run_id` lineage.
 
 ## Remaining
 
-- Optional packaging follow-up: `pyproject.toml` / editable install support.
-- Optional feature follow-ups: run ID lineage and pipeline mode config extraction.
+- Optional packaging follow-up: broader editable-install follow-through and repo packaging cleanup beyond the minimal `pyproject.toml`.
 
 ## GitHub Actions
 

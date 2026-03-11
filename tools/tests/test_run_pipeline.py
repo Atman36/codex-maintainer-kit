@@ -198,6 +198,11 @@ class RunPipelineTests(unittest.TestCase):
             },
         }
 
+    def write_pipeline_modes_config(self, name, payload):
+        config_path = self.factory.root / name
+        config_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        return config_path
+
     def test_default_artifact_dir_is_repo_relative(self):
         repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)
 
@@ -215,6 +220,51 @@ class RunPipelineTests(unittest.TestCase):
         )
 
         self.assertEqual(expanded, "save /tmp/example/analysis_report/critic.json")
+
+    def test_pipeline_mode_config_loaded_from_file(self):
+        config_path = self.write_pipeline_modes_config(
+            "pipeline_modes.json",
+            {
+                "schema_version": "1.0",
+                "analysis_stage_order": {
+                    "full": ["scout", "analyst", "critic", "gatekeeper"],
+                    "quick-win": ["scout", "gatekeeper"],
+                    "architecture": ["architect", "critic", "gatekeeper"],
+                },
+            },
+        )
+
+        loaded = run_pipeline.load_pipeline_mode_analysis_stage_order(config_path)
+
+        self.assertEqual(loaded["full"], ["scout", "analyst", "critic", "gatekeeper"])
+        self.assertEqual(loaded["quick-win"], ["scout", "gatekeeper"])
+        self.assertEqual(loaded["architecture"], ["architect", "critic", "gatekeeper"])
+
+    def test_pipeline_mode_config_missing_file_fails_clear_error(self):
+        missing = self.factory.root / "missing-pipeline-modes.json"
+
+        with self.assertRaises(run_pipeline.PipelineModeConfigError) as ctx:
+            run_pipeline.load_pipeline_mode_analysis_stage_order(missing)
+
+        self.assertIn("Pipeline mode config is missing", str(ctx.exception))
+
+    def test_pipeline_mode_config_rejects_unknown_stage(self):
+        config_path = self.write_pipeline_modes_config(
+            "invalid-pipeline-modes.json",
+            {
+                "schema_version": "1.0",
+                "analysis_stage_order": {
+                    "full": ["scout", "analyst", "critic", "gatekeeper"],
+                    "quick-win": ["scout", "gatekeeper"],
+                    "architecture": ["architect", "critic", "shipit"],
+                },
+            },
+        )
+
+        with self.assertRaises(run_pipeline.PipelineModeConfigError) as ctx:
+            run_pipeline.load_pipeline_mode_analysis_stage_order(config_path)
+
+        self.assertIn("unknown stage(s): shipit", str(ctx.exception))
 
     def test_architecture_mode_surfaces_single_candidate_in_top_improvements(self):
         repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)
@@ -326,7 +376,7 @@ class RunPipelineTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertEqual(payload["data"]["top_improvements"], [{"id": "cand-architect", "title": "Architect improvement"}])
 
-    def run_alias_pipeline(self, mode):
+    def run_alias_pipeline_with_repo(self, mode):
         repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)
         stage_stub = self.write_alias_stage_stub()
         py = shlex.quote(str(stage_stub))
@@ -383,7 +433,12 @@ class RunPipelineTests(unittest.TestCase):
                 *stage_commands,
             ]
         )
-        return run_pipeline.run_pipeline(args)
+        exit_code, payload = run_pipeline.run_pipeline(args)
+        return repo, exit_code, payload
+
+    def run_alias_pipeline(self, mode):
+        _, exit_code, payload = self.run_alias_pipeline_with_repo(mode)
+        return exit_code, payload
 
     def test_default_summary_output_uses_stable_artifact_dir(self):
         repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)
@@ -424,6 +479,42 @@ class RunPipelineTests(unittest.TestCase):
         self.assertEqual(summary_path.parent, run_pipeline.default_artifact_dir(repo).resolve())
         self.assertTrue(summary_path.exists())
         self.assertNotEqual(summary_path.parent, (caller_cwd / "analysis_report").resolve())
+
+    def test_pipeline_summary_lineage_uses_shared_run_id(self):
+        repo, exit_code, payload = self.run_alias_pipeline_with_repo(mode="quick-win")
+
+        self.assertEqual(exit_code, 0)
+        run_id = payload["data"]["run_id"]
+        self.assertTrue(run_id)
+
+        summary_path = Path(payload["data"]["pipeline_summary_path"])
+        self.assertTrue(summary_path.exists())
+        summary_payload = json.loads(summary_path.read_text(encoding="utf-8"))
+        self.assertEqual(summary_payload["run_id"], run_id)
+
+        lineage = summary_payload["lineage"]
+        self.assertEqual(Path(lineage["artifact_root"]).resolve(), run_pipeline.run_artifact_dir(repo, run_id).resolve())
+        self.assertEqual(Path(lineage["summary_path"]).resolve(), summary_path.resolve())
+        self.assertEqual([item["stage"] for item in lineage["analysis_stage_payloads"]], ["scout", "gatekeeper"])
+        self.assertEqual([item["id"] for item in lineage["pr_specs"]], ["prspec-cand-scout"])
+        self.assertEqual(
+            [item["stage"] for item in lineage["pr_stage_payloads"]],
+            ["implement", "reviewer", "pr_writer"],
+        )
+
+        scout_payload_path = Path(lineage["analysis_stage_payloads"][0]["path"])
+        implement_payload_path = Path(lineage["pr_stage_payloads"][0]["path"])
+        prspec_path = Path(lineage["pr_specs"][0]["path"])
+        self.assertTrue(scout_payload_path.exists())
+        self.assertTrue(implement_payload_path.exists())
+        self.assertTrue(prspec_path.exists())
+
+        scout_payload = json.loads(scout_payload_path.read_text(encoding="utf-8"))
+        implement_payload = json.loads(implement_payload_path.read_text(encoding="utf-8"))
+        self.assertEqual(scout_payload["data"]["run_id"], run_id)
+        self.assertEqual(implement_payload["data"]["run_id"], run_id)
+        self.assertEqual(scout_payload["data"]["lineage"]["stage_payload_path"], str(scout_payload_path))
+        self.assertEqual(implement_payload["data"]["lineage"]["stage_payload_path"], str(implement_payload_path))
 
     def test_pipeline_summary_payload_is_validated(self):
         repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)

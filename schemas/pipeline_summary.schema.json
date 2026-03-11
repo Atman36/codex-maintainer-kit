@@ -7,10 +7,12 @@
   "required": [
     "schema_version",
     "id",
+    "run_id",
     "generated_at",
     "pipeline_mode",
     "runner_selected",
     "status",
+    "lineage",
     "preflight",
     "stage_durations",
     "pr_results",
@@ -23,6 +25,10 @@
       "const": "1.0"
     },
     "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
       "type": "string",
       "minLength": 1
     },
@@ -41,6 +47,87 @@
     "status": {
       "type": "string",
       "enum": ["success", "needs_human"]
+    },
+    "lineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_root",
+        "summary_path",
+        "analysis_stage_payloads",
+        "pr_specs",
+        "pr_stage_payloads"
+      ],
+      "properties": {
+        "artifact_root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "summary_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "analysis_stage_payloads": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["stage", "path"],
+            "properties": {
+              "stage": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "pr_specs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["index", "id", "path"],
+            "properties": {
+              "index": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "pr_stage_payloads": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["index", "stage", "path"],
+            "properties": {
+              "index": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "stage": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
     },
     "preflight": {
       "type": "object",
