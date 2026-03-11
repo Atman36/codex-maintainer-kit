@@ -21,7 +21,9 @@ Prompts use placeholders like:
 - `{{CONSTRAINTS}}` (plain bullet list)
 - `{{ALLOWED_COMMANDS}}` (plain bullet list)
 - `{{CONTEXT_PATH}}` (optional external context path)
-- `{{ARTIFACT_DIR}}` / `{{REPORT_PATH}}` (portable artifact locations injected by the orchestrator)
+- `{{ARTIFACT_DIR}}` (default: repo-local `analysis_report/`)
+- `{{REPORT_PATH}}` (default: repo-local `analysis_report/runs/<run_id>/report.md`)
+- `{{RUNNER}}` (selected execution backend, for example `cli` or `task`)
 
 ## Output rule (important)
 

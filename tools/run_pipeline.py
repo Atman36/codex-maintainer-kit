@@ -163,6 +163,10 @@ def run_artifact_dir(repo_root: Path, run_id: str) -> Path:
     return default_artifact_dir(repo_root) / "runs" / run_id
 
 
+def default_report_path(repo_root: Path, run_id: str) -> Path:
+    return run_artifact_dir(repo_root, run_id) / "report.md"
+
+
 @lru_cache(maxsize=None)
 def _load_pipeline_mode_analysis_stage_order(config_path_str: str) -> Dict[str, List[str]]:
     config_path = Path(config_path_str)
@@ -1164,6 +1168,7 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
     pr_spec_lineage: List[Dict[str, Any]] = []
     pr_stage_lineage: List[Dict[str, Any]] = []
     artifact_root = run_artifact_dir(repo_root, run_id)
+    report_path = default_report_path(repo_root, run_id)
 
     with tempfile.TemporaryDirectory(prefix="pr-factory-") as tmp_dir:
         tmp = Path(tmp_dir)
@@ -1177,6 +1182,8 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
             "MAX_PRS": str(args.max_prs),
             "TEMP_DIR": str(tmp),
             "ARTIFACT_DIR": str(default_artifact_dir(repo_root)),
+            "REPORT_PATH": str(report_path),
+            "RUNNER": runner_adapter.name,
         }
 
         # Analysis path executes once.
@@ -1250,7 +1257,7 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
             analysis_stage_paths[stage] = str(payload_path)
             analysis_stage_lineage.append({"stage": stage, "path": str(payload_path)})
 
-            if stage in {"scout", "architect"}:
+            if stage in {"scout", "analyst", "architect"}:
                 collected_improvements = collect_top_improvements(payload)
                 if collected_improvements:
                     top_improvements = collected_improvements

@@ -28,7 +28,7 @@ Canonical set (enforced by `contract_registry.py`) — key ones:
 - `{{REPO_ROOT}}`, `{{REPO_URL}}`, `{{BASE_BRANCH}}`, `{{HEAD_BRANCH}}`
 - `{{CONSTRAINTS}}`, `{{ALLOWED_COMMANDS}}`
 - `{{ARTIFACT_DIR}}` — where analysis-stage JSON artifacts are written (default: `analysis_report/`)
-- `{{REPORT_PATH}}` — where a markdown report should be written
+- `{{REPORT_PATH}}` — where a markdown report should be written (default: `analysis_report/runs/<run_id>/report.md`)
 - `{{MODE}}`, `{{FOCUS}}`, `{{STAGE}}`, `{{COMMAND}}`, `{{RUNNER}}`
 - Per-stage JSON paths: `{{SCOUT_JSON}}`, `{{ANALYST_JSON}}`, `{{ARCHITECT_JSON}}`, `{{CRITIC_JSON}}`, `{{GATEKEEPER_JSON}}`, `{{IMPLEMENT_JSON}}`, `{{REVIEWER_JSON}}`, `{{PRSPEC_JSON}}`
 

@@ -173,7 +173,7 @@ Keep `revise/reject` for broad refactors, migrations, new dependencies, API brea
       ],
       "drivers_negative": []
     },
-    "go_no_go_next_step": "approve → Implementer"
+    "go_no_go_next_step": "approve → Gatekeeper"
   }
 }
 ```
@@ -192,7 +192,7 @@ SAVED_JSON_PATH=<absolute_path_to_{{ARTIFACT_DIR}}/critic-<timestamp>.json>
 
 ### approve
 Changes are well-justified, scope is minimal, risk is acceptable.
-**Next step:** Implementer
+**Next step:** Gatekeeper
 
 ### revise
 Good idea, but needs refinement of scope/approach/plan.
@@ -278,7 +278,7 @@ Changes are unnecessary/too risky/not a fit for the project.
       ],
       "drivers_negative": []
     },
-    "go_no_go_next_step": "approve → Implementer"
+    "go_no_go_next_step": "approve → Gatekeeper"
   }
 }
 ```

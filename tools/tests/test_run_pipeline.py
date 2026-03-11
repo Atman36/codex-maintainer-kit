@@ -221,6 +221,16 @@ class RunPipelineTests(unittest.TestCase):
 
         self.assertEqual(expanded, "save /tmp/example/analysis_report/critic.json")
 
+    def test_expand_template_accepts_report_path_placeholder(self):
+        expanded = run_pipeline.expand_template(
+            "write {{REPORT_PATH}}",
+            {
+                "REPORT_PATH": "/tmp/example/analysis_report/runs/run-123/report.md",
+            },
+        )
+
+        self.assertEqual(expanded, "write /tmp/example/analysis_report/runs/run-123/report.md")
+
     def test_pipeline_mode_config_loaded_from_file(self):
         config_path = self.write_pipeline_modes_config(
             "pipeline_modes.json",
@@ -375,6 +385,12 @@ class RunPipelineTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(payload["data"]["top_improvements"], [{"id": "cand-architect", "title": "Architect improvement"}])
+
+    def test_full_mode_uses_analyst_candidates_in_top_improvements(self):
+        exit_code, payload = self.run_alias_pipeline(mode="full")
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(payload["data"]["top_improvements"], [{"id": "cand-analyst", "source_stage": "scout"}])
 
     def run_alias_pipeline_with_repo(self, mode):
         repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)
@@ -746,6 +762,123 @@ class RunPipelineTests(unittest.TestCase):
                 self.assertIn(f"{expected_source}.json", gatekeeper_stage["command"])
                 pr_spec = payload["data"]["pr_results"][0]["pr_spec"]
                 self.assertEqual(pr_spec["id"], f"prspec-cand-{expected_source}")
+
+    def test_template_values_include_runner_name(self):
+        repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)
+        stage_stub = self.write_stage_stub(
+            "runner_placeholder_stub.py",
+            f"""
+            import json
+            import sys
+            from pathlib import Path
+
+            TS = "2026-01-01T00:00:00Z"
+
+            def emit(stage, data=None, pr_spec=None):
+                payload = {{
+                    "schema_version": "1.0",
+                    "id": f"{{stage}}-id",
+                    "stage": stage,
+                    "status": "success",
+                    "summary": "ok",
+                    "started_at": TS,
+                    "finished_at": TS,
+                    "exit_code": 0,
+                    "stdout": "",
+                    "stderr": "",
+                    "artifacts": [],
+                    "metrics": {{
+                        "duration_ms": 1,
+                        "cost_usd": 0.0,
+                        "tokens_in": 0,
+                        "tokens_out": 0,
+                    }},
+                    "errors": [],
+                    "warnings": [],
+                    "data": data or {{}},
+                }}
+                if pr_spec is not None:
+                    payload["pr_spec"] = pr_spec
+                print(json.dumps(payload))
+
+            def make_pr_spec():
+                return {{
+                    "schema_version": "1.0",
+                    "id": "prspec-runner",
+                    "repo": {{"url": "https://example.com/repo", "owner": "o", "name": "n", "default_branch": "main"}},
+                    "base": {{"branch": "main"}},
+                    "head": {{"branch": "feature/runner"}},
+                    "title": "Runner placeholder regression",
+                    "body_markdown": "## What\\nRunner placeholder\\n\\n## Why\\nCoverage\\n\\n## How to verify\\n```bash\\npython3 -m unittest tools.tests.test_run_pipeline.RunPipelineTests.test_template_values_include_runner_name\\n```",
+                    "change_type": "test",
+                    "risk": "low",
+                    "files_touched": ["README.md"],
+                    "test_plan": ["python3 -m unittest tools.tests.test_run_pipeline.RunPipelineTests.test_template_values_include_runner_name"],
+                    "ai_assistance": {{"used": True, "tools": [{{"name": "codex", "role": "test"}}], "disclosure_line": "AI assisted"}},
+                }}
+
+            stage = sys.argv[1]
+            if stage == "scout":
+                report_path = Path(sys.argv[3]).resolve()
+                emit(
+                    "scout",
+                    data={{
+                        "runner_arg": sys.argv[2],
+                        "report_path": str(report_path),
+                        "report_parent_name": report_path.parent.name,
+                        "candidates": [{{"id": "cand-runner"}}],
+                    }},
+                )
+            elif stage == "gatekeeper":
+                emit(
+                    "gatekeeper",
+                    data={{"selected": [{{"candidate_id": "cand-runner", "decision": "pr"}}], "pr_specs": [make_pr_spec()]}},
+                    pr_spec=make_pr_spec(),
+                )
+            elif stage == "implement":
+                pr_spec = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+                emit("implement", data={{"implemented": pr_spec["id"]}})
+            elif stage == "reviewer":
+                emit("reviewer", data={{"reviewed": "ok"}})
+            elif stage == "pr_writer":
+                pr_spec = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+                emit("pr_writer", pr_spec=pr_spec)
+            else:
+                raise SystemExit(f"unknown stage: {{stage}}")
+            """,
+        )
+
+        py = shlex.quote(str(stage_stub))
+        args = run_pipeline.parse_args(
+            [
+                "--repo-root",
+                str(repo),
+                "--mode",
+                "quick-win",
+                "--runner",
+                "cli",
+                "--stage-command",
+                f"scout=python3 {py} scout {{{{RUNNER}}}} {{{{REPORT_PATH}}}}",
+                "--stage-command",
+                f"gatekeeper=python3 {py} gatekeeper",
+                "--stage-command",
+                f"implement=python3 {py} implement {{{{PRSPEC_JSON}}}}",
+                "--stage-command",
+                f"reviewer=python3 {py} reviewer {{{{IMPLEMENT_RESULT_JSON}}}}",
+                "--stage-command",
+                f"pr_writer=python3 {py} pr_writer {{{{PRSPEC_JSON}}}}",
+            ]
+        )
+
+        exit_code, payload = run_pipeline.run_pipeline(args)
+
+        self.assertEqual(exit_code, 0)
+        scout_lineage = payload["data"]["lineage"]["analysis_stage_payloads"][0]
+        scout_payload = json.loads(Path(scout_lineage["path"]).read_text(encoding="utf-8"))
+        expected_report_path = run_pipeline.default_report_path(repo, payload["data"]["run_id"]).resolve()
+        self.assertEqual(scout_payload["data"]["runner_arg"], "cli")
+        self.assertEqual(Path(scout_payload["data"]["report_path"]).resolve(), expected_report_path)
+        self.assertEqual(scout_payload["data"]["report_parent_name"], payload["data"]["run_id"])
 
     def test_unknown_placeholder_fails_before_stage_execution(self):
         marker = self.factory.root / "unknown-placeholder-ran.txt"

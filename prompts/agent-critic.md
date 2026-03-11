@@ -77,7 +77,7 @@ OUTPUT:
       "drivers_positive": ["..."],
       "drivers_negative": ["..."]
     },
-    "go_no_go_next_step": "если approve → Implementer; если revise → Analyst; если reject → остановить"
+    "go_no_go_next_step": "если approve → Gatekeeper; если revise → Analyst; если reject → остановить"
   }
 }
 
