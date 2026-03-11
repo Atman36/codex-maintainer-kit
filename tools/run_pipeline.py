@@ -300,8 +300,11 @@ def gate_failed(stage: str, payload: Dict[str, Any]) -> Optional[str]:
             return f"Critic gate failed: decision={decision or 'missing'}"
     elif stage == "gatekeeper":
         decision = gatekeeper_decision(payload)
+        status = stage_status(payload)
         if decision != "pr":
             return f"Gatekeeper gate failed: decision={decision or 'missing'}"
+        if status != "success":
+            return f"Gatekeeper gate failed: status={status or 'missing'}"
     elif stage in ("implement", "reviewer", "pr_writer", "publish"):
         status = stage_status(payload)
         if status != "success":

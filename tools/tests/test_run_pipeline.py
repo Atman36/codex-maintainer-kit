@@ -638,6 +638,72 @@ class RunPipelineTests(unittest.TestCase):
         self.assertIn("$.risk", payload["stderr"])
         self.assertIn("field: risk", payload["stderr"])
 
+    def test_gatekeeper_needs_human_with_prspec_blocks_fanout(self):
+        repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)
+        valid_spec = self.make_valid_pr_spec("prspec-needs-human")
+        stage_stub = self.write_stage_stub(
+            "gatekeeper_needs_human_stub.py",
+            f"""
+            import json
+            import sys
+
+            TS = "2026-01-01T00:00:00Z"
+            PR_SPEC = {repr(valid_spec)}
+
+            def emit(stage, status="success", data=None, pr_spec=None):
+                payload = {{
+                    "schema_version": "1.0",
+                    "id": f"{{stage}}-id",
+                    "stage": stage,
+                    "status": status,
+                    "summary": "ok",
+                    "started_at": TS,
+                    "finished_at": TS,
+                    "exit_code": 0,
+                    "stdout": "",
+                    "stderr": "",
+                    "artifacts": [],
+                    "metrics": {{
+                        "duration_ms": 1,
+                        "cost_usd": 0.0,
+                        "tokens_in": 0,
+                        "tokens_out": 0,
+                    }},
+                    "errors": [],
+                    "warnings": [],
+                    "data": data or {{}},
+                }}
+                if pr_spec is not None:
+                    payload["pr_spec"] = pr_spec
+                print(json.dumps(payload))
+
+            stage = sys.argv[1]
+            if stage == "scout":
+                emit("scout", data={{"candidates": [{{"id": "cand-1"}}]}})
+            elif stage == "gatekeeper":
+                emit(
+                    "gatekeeper",
+                    status="needs_human",
+                    data={{
+                        "selected": [{{"candidate_id": "cand-1", "decision": "pr"}}],
+                        "pr_specs": [PR_SPEC],
+                    }},
+                    pr_spec=PR_SPEC,
+                )
+            elif stage == "implement":
+                raise SystemExit("implement should not run")
+            else:
+                emit(stage)
+            """,
+        )
+
+        exit_code, payload = self.run_quick_win_pipeline_with_stub(repo=repo, stage_stub=stage_stub)
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(payload["status"], "needs_human")
+        self.assertFalse(payload["data"]["pr_results"])
+        self.assertIn("Gatekeeper gate failed: status=needs_human", payload["stderr"])
+
     def test_raw_critic_payload_rejected(self):
         stage_stub = self.write_stage_stub(
             "raw_critic_payload_stub.py",

@@ -13,7 +13,6 @@ Confirmed done:
 - Metadata `*_JSON` path-vs-object contract drift is no longer present in scanned PR Factory skills.
 
 Confirmed still open:
-- `gatekeeper` fan-out still ignores top-level `status` and only checks decision / embedded PRSpec presence.
 - `collect_top_improvements()` still ignores `data.candidate`, so architecture mode can still lose its primary signal.
 - Root docs are still outside `DOC_FILES`, and `README.md` still contains dead `{{CONTEXT}}`.
 - Hardcoded `/Users/Apple/Developer/pr-factory-kit/analysis_report/...` paths still exist across prompts/skills/docs.
@@ -27,6 +26,8 @@ Confirmed still open:
 - Added regression coverage for lowercase `how tested`.
 - Added a repository smoke test that expects zero contract issues.
 - Updated CI and `tools/README.md` to remove stale `pyyaml`, switch examples to `python3`, and document the current Critic `ExecutionResult` format.
+- Tightened gatekeeper semantics so PR fan-out now requires both `decision="pr"` and top-level `status="success"`.
+- Added regression coverage to block fan-out when `gatekeeper` returns `needs_human` alongside otherwise valid `pr_spec` / `data.pr_specs`.
 
 ## Remaining
 
