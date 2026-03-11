@@ -55,6 +55,24 @@ class JsonUtilsTests(unittest.TestCase):
         payload = json_utils.parse_stage_output(f"SAVED_JSON_PATH={path}")
         self.assertEqual(payload["status"], "success")
 
+    def test_parse_stage_output_with_provenance_tracks_saved_json_source(self):
+        path = self.write_payload("persisted/result.json")
+
+        parsed = json_utils.parse_stage_output_with_provenance(f"SAVED_JSON_PATH={path}")
+
+        self.assertEqual(parsed.source_kind, "saved_json_path")
+        self.assertEqual(parsed.source_path, str(path.resolve()))
+        self.assertEqual(len(parsed.source_sha256), 64)
+
+    def test_parse_stage_output_resolves_relative_saved_json_path_from_stage_cwd(self):
+        stage_cwd = self.root / "stage-cwd"
+        path = self.write_payload("stage-cwd/out/result.json")
+
+        parsed = json_utils.parse_stage_output_with_provenance("SAVED_JSON_PATH=out/result.json", cwd=stage_cwd)
+
+        self.assertEqual(parsed.payload["value"], 1)
+        self.assertEqual(parsed.source_path, str(path.resolve()))
+
 
 if __name__ == "__main__":
     unittest.main()

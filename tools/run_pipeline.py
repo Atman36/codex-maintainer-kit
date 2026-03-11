@@ -33,8 +33,9 @@ if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
 from pr_factory_lib.git_utils import run_git  # noqa: E402
-from pr_factory_lib.json_utils import parse_stage_output, write_json  # noqa: E402
+from pr_factory_lib.json_utils import parse_stage_output_with_provenance, write_json  # noqa: E402
 from pr_factory_lib.schema_utils import SchemaValidationError, validate_pipeline_summary, validate_stage_payload  # noqa: E402
+from quality_gate import build_report as build_quality_gate_report  # noqa: E402
 
 
 IMPLEMENTATION_STAGES: List[str] = ["implement", "reviewer", "pr_writer"]
@@ -73,6 +74,7 @@ class StageRun:
     payload: Optional[Dict[str, Any]]
     elapsed_ms: int
     runner: str
+    payload_source: Dict[str, Any]
 
 
 @dataclass
@@ -304,8 +306,15 @@ def run_stage(
     elapsed_ms = int((time.time() - started) * 1000)
 
     payload: Optional[Dict[str, Any]] = None
+    payload_source: Dict[str, Any] = {}
     if proc.returncode == 0:
-        payload = parse_stage_output(proc.stdout)
+        parsed_output = parse_stage_output_with_provenance(proc.stdout, cwd=cwd)
+        payload = parsed_output.payload
+        payload_source = {
+            "kind": parsed_output.source_kind,
+            "path": parsed_output.source_path,
+            "sha256": parsed_output.source_sha256,
+        }
         validate_stage_payload(payload=payload, expected_stage=stage)
     return StageRun(
         stage=stage,
@@ -316,6 +325,7 @@ def run_stage(
         payload=payload,
         elapsed_ms=elapsed_ms,
         runner=adapter.name,
+        payload_source=payload_source,
     )
 
 
@@ -464,6 +474,7 @@ def persist_stage_payload(
     run_id: str,
     artifact_root: Path,
     lineage: Dict[str, Any],
+    payload_source: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     persisted_payload = json.loads(json.dumps(payload))
     data = persisted_payload.get("data")
@@ -478,12 +489,47 @@ def persist_stage_payload(
     payload_lineage.update(lineage)
     payload_lineage["artifact_root"] = str(artifact_root)
     payload_lineage["stage_payload_path"] = str(path)
+    payload_lineage["original_source"] = {
+        "kind": str((payload_source or {}).get("kind") or "stdout"),
+        "path": str((payload_source or {}).get("path") or ""),
+        "sha256": str((payload_source or {}).get("sha256") or ""),
+    }
     data["lineage"] = payload_lineage
     data["run_id"] = run_id
 
     path.parent.mkdir(parents=True, exist_ok=True)
     write_json(path, persisted_payload)
     return persisted_payload
+
+
+def build_quality_gate_proof(
+    *,
+    repo_root: Path,
+    prspec: Dict[str, Any],
+    prspec_path: Path,
+    run_id: str,
+    pr_index: int,
+    base_ref: str,
+) -> Dict[str, Any]:
+    report = build_quality_gate_report(
+        repo_root,
+        prspec=prspec,
+        base_ref=base_ref,
+        enforce_files_touched=True,
+        autoclean_unplanned=False,
+        ignored_paths=[str(default_artifact_dir(repo_root).relative_to(repo_root))],
+    )
+    return {
+        "schema_version": "1.0",
+        "generated_at": utc_now(),
+        "run_id": run_id,
+        "pr_index": pr_index,
+        "prspec_id": str(prspec.get("id") or f"prspec-{pr_index}"),
+        "prspec_path": str(prspec_path),
+        "base_ref": base_ref,
+        "report": report,
+        "ok": bool(report.get("ok")),
+    }
 
 
 def normalize_head_branch(pr_spec: Dict[str, Any], index: int) -> str:
@@ -864,6 +910,7 @@ def execute_stage_with_retries(
                 payload=None,
                 elapsed_ms=0,
                 runner=adapter.name,
+                payload_source={},
             )
 
         final_run = run_result
@@ -1290,6 +1337,7 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
     analysis_stage_lineage: List[Dict[str, Any]] = []
     pr_spec_lineage: List[Dict[str, Any]] = []
     pr_stage_lineage: List[Dict[str, Any]] = []
+    quality_gate_lineage: List[Dict[str, Any]] = []
     artifact_root = run_artifact_dir(repo_root, run_id)
     report_path = default_report_path(repo_root, run_id)
     analysis_artifact_dir = default_analysis_artifact_dir(repo_root, run_id)
@@ -1372,6 +1420,7 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
                 run_id=run_id,
                 artifact_root=artifact_root,
                 lineage={"stage": stage, "pipeline_mode": args.mode},
+                payload_source=run_result.payload_source,
             )
             if stage == "critic":
                 summary["status"] = critic_decision(payload)
@@ -1381,7 +1430,13 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
             stage_summaries.append(summary)
             analysis_stage_payloads[stage] = payload
             analysis_stage_paths[stage] = str(payload_path)
-            analysis_stage_lineage.append({"stage": stage, "path": str(payload_path)})
+            analysis_stage_lineage.append(
+                {
+                    "stage": stage,
+                    "path": str(payload_path),
+                    "original_source": payload["data"]["lineage"]["original_source"],
+                }
+            )
 
             if stage in {"scout", "analyst", "architect"}:
                 collected_improvements = collect_top_improvements(payload)
@@ -1480,11 +1535,56 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
                                         "pr_index": index,
                                         "prspec_path": str(prspec_path),
                                     },
+                                    payload_source=payload.get("data", {}).get("lineage", {}).get("original_source"),
                                 )
                                 pr_stage_payloads[previous_stage] = persisted_payload
                                 per_pr_template_values[f"{previous_stage.upper()}_JSON"] = str(path)
 
                             if stage == "publish":
+                                quality_gate_proof_path = pr_dir / "quality_gate.json"
+                                try:
+                                    quality_gate_proof = build_quality_gate_proof(
+                                        repo_root=repo_root,
+                                        prspec=normalized_pr_spec,
+                                        prspec_path=prspec_path,
+                                        run_id=run_id,
+                                        pr_index=index,
+                                        base_ref=preflight.base_sha_at_start or "HEAD",
+                                    )
+                                    write_json(quality_gate_proof_path, quality_gate_proof)
+                                    quality_gate_lineage.append(
+                                        {
+                                            "index": index,
+                                            "path": str(quality_gate_proof_path),
+                                            "ok": bool(quality_gate_proof.get("ok")),
+                                        }
+                                    )
+                                    per_pr_template_values["QUALITY_GATE_JSON"] = str(quality_gate_proof_path)
+                                except OSError as exc:
+                                    pr_errors.append(
+                                        StructuredError(
+                                            reason=f"Failed to persist quality gate proof: {exc}",
+                                            failed_stage="publish",
+                                            next_action="Ensure the artifact directory is writable and rerun publish.",
+                                        )
+                                    )
+                                    break
+
+                                if not quality_gate_proof.get("ok"):
+                                    pr_errors.append(
+                                        StructuredError(
+                                            reason=(
+                                                "Publish blocked: structured quality gate evidence is present but failing. "
+                                                f"See {quality_gate_proof_path}."
+                                            ),
+                                            failed_stage="publish",
+                                            next_action=(
+                                                "Fix forbidden/unplanned/secret findings in the quality gate proof and rerun publish."
+                                            ),
+                                        )
+                                    )
+                                    break
+
                                 try:
                                     current_base_sha, _ = resolve_base_sha(
                                         repo_root=repo_root,
@@ -1583,12 +1683,20 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
                                     "pr_index": index,
                                     "prspec_path": str(prspec_path),
                                 },
+                                payload_source=run_result.payload_source,
                             )
                             stage_summary["status"] = stage_status(payload)
                             stage_summary["payload_path"] = str(payload_path)
                             pr_stage_summaries.append(stage_summary)
                             pr_stage_payloads[stage] = payload
-                            pr_stage_lineage.append({"index": index, "stage": stage, "path": str(payload_path)})
+                            pr_stage_lineage.append(
+                                {
+                                    "index": index,
+                                    "stage": stage,
+                                    "path": str(payload_path),
+                                    "original_source": payload["data"]["lineage"]["original_source"],
+                                }
+                            )
 
                             gate_msg = gate_failed(stage, payload)
                             if gate_msg:
@@ -1652,6 +1760,10 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
                                 "lineage": {
                                     "prspec_path": str(prspec_path),
                                     "stage_payloads": [item for item in pr_stage_lineage if item.get("index") == index],
+                                    "quality_gate_proof": next(
+                                        (item for item in quality_gate_lineage if item.get("index") == index),
+                                        {},
+                                    ),
                                 },
                                 "base_sha_at_start": preflight.base_sha_at_start,
                                 "base_sha_at_publish": base_sha_at_publish,
@@ -1688,6 +1800,7 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
             "analysis_stage_payloads": analysis_stage_lineage,
             "pr_specs": pr_spec_lineage,
             "pr_stage_payloads": pr_stage_lineage,
+            "quality_gate_proofs": quality_gate_lineage,
         }
         summary_payload = {
             "schema_version": "1.0",

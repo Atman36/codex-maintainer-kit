@@ -516,6 +516,7 @@ class RunPipelineTests(unittest.TestCase):
         self.assertEqual(Path(lineage["summary_path"]).resolve(), summary_path.resolve())
         self.assertEqual([item["stage"] for item in lineage["analysis_stage_payloads"]], ["scout", "gatekeeper"])
         self.assertEqual([item["id"] for item in lineage["pr_specs"]], ["prspec-cand-scout"])
+        self.assertEqual(lineage["quality_gate_proofs"], [])
         self.assertEqual(
             [item["stage"] for item in lineage["pr_stage_payloads"]],
             ["implement", "reviewer", "pr_writer"],
@@ -534,6 +535,371 @@ class RunPipelineTests(unittest.TestCase):
         self.assertEqual(implement_payload["data"]["run_id"], run_id)
         self.assertEqual(scout_payload["data"]["lineage"]["stage_payload_path"], str(scout_payload_path))
         self.assertEqual(implement_payload["data"]["lineage"]["stage_payload_path"], str(implement_payload_path))
+        self.assertEqual(lineage["analysis_stage_payloads"][0]["original_source"]["kind"], "stdout")
+        self.assertEqual(lineage["pr_stage_payloads"][0]["original_source"]["kind"], "stdout")
+        self.assertEqual(len(lineage["analysis_stage_payloads"][0]["original_source"]["sha256"]), 64)
+
+    def test_lineage_preserves_saved_json_source_path_and_checksum(self):
+        repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)
+        stage_stub = self.write_stage_stub(
+            "saved_json_stage_stub.py",
+            """
+            import json
+            import sys
+            from pathlib import Path
+
+            TS = "2026-01-01T00:00:00Z"
+
+            def payload_for(stage):
+                base = {
+                    "schema_version": "1.0",
+                    "id": f"{stage}-id",
+                    "stage": stage,
+                    "status": "success",
+                    "summary": "ok",
+                    "started_at": TS,
+                    "finished_at": TS,
+                    "exit_code": 0,
+                    "stdout": "",
+                    "stderr": "",
+                    "artifacts": [],
+                    "metrics": {
+                        "duration_ms": 1,
+                        "cost_usd": 0.0,
+                        "tokens_in": 0,
+                        "tokens_out": 0,
+                    },
+                    "errors": [],
+                    "warnings": [],
+                    "data": {},
+                }
+                if stage == "scout":
+                    base["data"] = {"candidates": [{"id": "cand-saved"}]}
+                elif stage == "gatekeeper":
+                    pr_spec = {
+                        "schema_version": "1.0",
+                        "id": "prspec-saved",
+                        "repo": {"url": "https://example.com/repo", "owner": "o", "name": "n", "default_branch": "main"},
+                        "base": {"branch": "main"},
+                        "head": {"branch": "feature/saved"},
+                        "title": "Saved source lineage",
+                        "body_markdown": "## What\\nSaved source\\n\\n## Why\\nCoverage\\n\\n## How to verify\\n```bash\\npython3 -m unittest tools.tests.test_run_pipeline.RunPipelineTests.test_lineage_preserves_saved_json_source_path_and_checksum\\n```",
+                        "change_type": "test",
+                        "risk": "low",
+                        "files_touched": ["README.md"],
+                        "test_plan": ["python3 -m unittest tools.tests.test_run_pipeline.RunPipelineTests.test_lineage_preserves_saved_json_source_path_and_checksum"],
+                        "ai_assistance": {"used": True, "tools": [{"name": "codex", "role": "test"}], "disclosure_line": "AI assisted"},
+                    }
+                    base["data"] = {
+                        "selected": [{"candidate_id": "cand-saved", "decision": "pr"}],
+                        "pr_specs": [pr_spec],
+                    }
+                    base["pr_spec"] = pr_spec
+                return base
+
+            stage = sys.argv[1]
+            output_dir = Path(sys.argv[2]).resolve()
+            output_dir.mkdir(parents=True, exist_ok=True)
+            saved_path = output_dir / f"{stage}-saved.json"
+            saved_path.write_text(json.dumps(payload_for(stage)), encoding="utf-8")
+            print(f"SAVED_JSON_PATH={saved_path}")
+            """,
+        )
+
+        py = shlex.quote(str(stage_stub))
+        args = run_pipeline.parse_args(
+            [
+                "--repo-root",
+                str(repo),
+                "--mode",
+                "quick-win",
+                "--runner",
+                "cli",
+                "--allow-dirty",
+                "--stop-after",
+                "gatekeeper",
+                "--stage-command",
+                f"scout=python3 {py} scout {{{{ARTIFACT_DIR}}}}",
+                "--stage-command",
+                f"gatekeeper=python3 {py} gatekeeper {{{{ARTIFACT_DIR}}}}",
+            ]
+        )
+
+        exit_code, payload = run_pipeline.run_pipeline(args)
+
+        self.assertEqual(exit_code, 0)
+        summary_payload = json.loads(Path(payload["data"]["pipeline_summary_path"]).read_text(encoding="utf-8"))
+        scout_lineage = summary_payload["lineage"]["analysis_stage_payloads"][0]
+        self.assertEqual(scout_lineage["original_source"]["kind"], "saved_json_path")
+        self.assertTrue(scout_lineage["original_source"]["path"].endswith("scout-saved.json"))
+        self.assertEqual(len(scout_lineage["original_source"]["sha256"]), 64)
+
+    def test_publish_stage_is_blocked_without_passing_quality_gate_proof(self):
+        repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)
+        publish_marker = self.factory.root / "publish-blocked-marker.txt"
+        stage_stub = self.write_stage_stub(
+            "publish_gate_blocked_stub.py",
+            f"""
+            import json
+            import sys
+            from pathlib import Path
+
+            TS = "2026-01-01T00:00:00Z"
+            PUBLISH_MARKER = Path({str(publish_marker)!r})
+
+            def emit(stage, data=None, pr_spec=None):
+                payload = {{
+                    "schema_version": "1.0",
+                    "id": f"{{stage}}-id",
+                    "stage": stage,
+                    "status": "success",
+                    "summary": "ok",
+                    "started_at": TS,
+                    "finished_at": TS,
+                    "exit_code": 0,
+                    "stdout": "",
+                    "stderr": "",
+                    "artifacts": [],
+                    "metrics": {{
+                        "duration_ms": 1,
+                        "cost_usd": 0.0,
+                        "tokens_in": 0,
+                        "tokens_out": 0,
+                    }},
+                    "errors": [],
+                    "warnings": [],
+                    "data": data or {{}},
+                }}
+                if pr_spec is not None:
+                    payload["pr_spec"] = pr_spec
+                print(json.dumps(payload))
+
+            def make_pr_spec():
+                return {{
+                    "schema_version": "1.0",
+                    "id": "prspec-publish-blocked",
+                    "repo": {{"url": "https://example.com/repo", "owner": "o", "name": "n", "default_branch": "main"}},
+                    "base": {{"branch": "main"}},
+                    "head": {{"branch": "feature/publish-blocked"}},
+                    "title": "Publish blocked",
+                    "body_markdown": "## What\\nBlocked publish\\n\\n## Why\\nCoverage\\n\\n## How to verify\\n```bash\\npython3 -m unittest tools.tests.test_run_pipeline.RunPipelineTests.test_publish_stage_is_blocked_without_passing_quality_gate_proof\\n```",
+                    "change_type": "test",
+                    "risk": "low",
+                    "files_touched": ["README.md"],
+                    "test_plan": ["python3 -m unittest tools.tests.test_run_pipeline.RunPipelineTests.test_publish_stage_is_blocked_without_passing_quality_gate_proof"],
+                    "ai_assistance": {{"used": True, "tools": [{{"name": "codex", "role": "test"}}], "disclosure_line": "AI assisted"}},
+                }}
+
+            stage = sys.argv[1]
+            if stage == "scout":
+                emit("scout", data={{"candidates": [{{"id": "cand-blocked"}}]}})
+            elif stage == "gatekeeper":
+                pr_spec = make_pr_spec()
+                emit(
+                    "gatekeeper",
+                    data={{
+                        "selected": [{{"candidate_id": "cand-blocked", "decision": "pr"}}],
+                        "pr_specs": [pr_spec],
+                    }},
+                    pr_spec=pr_spec,
+                )
+            elif stage == "implement":
+                Path("rogue.txt").write_text("unexpected\\n", encoding="utf-8")
+                emit("implement", data={{"implemented": "prspec-publish-blocked"}})
+            elif stage == "reviewer":
+                emit("reviewer", data={{"reviewed": "ok"}})
+            elif stage == "pr_writer":
+                pr_spec = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+                emit("pr_writer", pr_spec=pr_spec)
+            elif stage == "publish":
+                PUBLISH_MARKER.write_text(sys.argv[2], encoding="utf-8")
+                emit("publish", data={{"pr": {{"url": "https://example.com/pr/1"}}}})
+            else:
+                raise SystemExit(f"unknown stage: {{stage}}")
+            """,
+        )
+
+        py = shlex.quote(str(stage_stub))
+        args = run_pipeline.parse_args(
+            [
+                "--repo-root",
+                str(repo),
+                "--mode",
+                "quick-win",
+                "--runner",
+                "cli",
+                "--publish",
+                "--allow-dirty",
+                "--stage-command",
+                f"scout=python3 {py} scout",
+                "--stage-command",
+                f"gatekeeper=python3 {py} gatekeeper",
+                "--stage-command",
+                f"implement=python3 {py} implement {{{{PRSPEC_JSON}}}}",
+                "--stage-command",
+                f"reviewer=python3 {py} reviewer {{{{IMPLEMENT_RESULT_JSON}}}}",
+                "--stage-command",
+                f"pr_writer=python3 {py} pr_writer {{{{PRSPEC_JSON}}}}",
+                "--stage-command",
+                f"publish=python3 {py} publish {{{{QUALITY_GATE_JSON}}}}",
+            ]
+        )
+        base_sha = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(repo),
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        preflight = run_pipeline.PreflightResult(True, [], [], [], base_sha, "cli")
+
+        with mock.patch.object(run_pipeline, "run_preflight", return_value=preflight):
+            exit_code, payload = run_pipeline.run_pipeline(args)
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(payload["status"], "needs_human")
+        self.assertIn("Publish blocked: structured quality gate evidence is present but failing", payload["stderr"])
+        self.assertFalse(publish_marker.exists())
+
+        summary_payload = json.loads(Path(payload["data"]["pipeline_summary_path"]).read_text(encoding="utf-8"))
+        proof_entry = summary_payload["lineage"]["quality_gate_proofs"][0]
+        self.assertFalse(proof_entry["ok"])
+        proof_payload = json.loads(Path(proof_entry["path"]).read_text(encoding="utf-8"))
+        self.assertFalse(proof_payload["ok"])
+        self.assertEqual(proof_payload["report"]["files_touched_check"]["unplanned_paths"], ["rogue.txt"])
+
+    def test_publish_stage_receives_explicit_quality_gate_proof(self):
+        repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)
+        publish_marker = self.factory.root / "publish-proof-marker.txt"
+        stage_stub = self.write_stage_stub(
+            "publish_gate_success_stub.py",
+            f"""
+            import json
+            import sys
+            from pathlib import Path
+
+            TS = "2026-01-01T00:00:00Z"
+            PUBLISH_MARKER = Path({str(publish_marker)!r})
+
+            def emit(stage, data=None, pr_spec=None):
+                payload = {{
+                    "schema_version": "1.0",
+                    "id": f"{{stage}}-id",
+                    "stage": stage,
+                    "status": "success",
+                    "summary": "ok",
+                    "started_at": TS,
+                    "finished_at": TS,
+                    "exit_code": 0,
+                    "stdout": "",
+                    "stderr": "",
+                    "artifacts": [],
+                    "metrics": {{
+                        "duration_ms": 1,
+                        "cost_usd": 0.0,
+                        "tokens_in": 0,
+                        "tokens_out": 0,
+                    }},
+                    "errors": [],
+                    "warnings": [],
+                    "data": data or {{}},
+                }}
+                if pr_spec is not None:
+                    payload["pr_spec"] = pr_spec
+                print(json.dumps(payload))
+
+            def make_pr_spec():
+                return {{
+                    "schema_version": "1.0",
+                    "id": "prspec-publish-ok",
+                    "repo": {{"url": "https://example.com/repo", "owner": "o", "name": "n", "default_branch": "main"}},
+                    "base": {{"branch": "main"}},
+                    "head": {{"branch": "feature/publish-ok"}},
+                    "title": "Publish ok",
+                    "body_markdown": "## What\\nPublish ok\\n\\n## Why\\nCoverage\\n\\n## How to verify\\n```bash\\npython3 -m unittest tools.tests.test_run_pipeline.RunPipelineTests.test_publish_stage_receives_explicit_quality_gate_proof\\n```",
+                    "change_type": "test",
+                    "risk": "low",
+                    "files_touched": ["README.md"],
+                    "test_plan": ["python3 -m unittest tools.tests.test_run_pipeline.RunPipelineTests.test_publish_stage_receives_explicit_quality_gate_proof"],
+                    "ai_assistance": {{"used": True, "tools": [{{"name": "codex", "role": "test"}}], "disclosure_line": "AI assisted"}},
+                }}
+
+            stage = sys.argv[1]
+            if stage == "scout":
+                emit("scout", data={{"candidates": [{{"id": "cand-ok"}}]}})
+            elif stage == "gatekeeper":
+                pr_spec = make_pr_spec()
+                emit(
+                    "gatekeeper",
+                    data={{
+                        "selected": [{{"candidate_id": "cand-ok", "decision": "pr"}}],
+                        "pr_specs": [pr_spec],
+                    }},
+                    pr_spec=pr_spec,
+                )
+            elif stage == "implement":
+                Path("README.md").write_text("hello\\nupdated\\n", encoding="utf-8")
+                emit("implement", data={{"implemented": "prspec-publish-ok"}})
+            elif stage == "reviewer":
+                emit("reviewer", data={{"reviewed": "ok"}})
+            elif stage == "pr_writer":
+                pr_spec = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+                emit("pr_writer", pr_spec=pr_spec)
+            elif stage == "publish":
+                proof = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+                PUBLISH_MARKER.write_text(json.dumps(proof), encoding="utf-8")
+                emit("publish", data={{"pr": {{"url": "https://example.com/pr/2"}}, "quality_gate_ok": proof["ok"]}})
+            else:
+                raise SystemExit(f"unknown stage: {{stage}}")
+            """,
+        )
+
+        py = shlex.quote(str(stage_stub))
+        args = run_pipeline.parse_args(
+            [
+                "--repo-root",
+                str(repo),
+                "--mode",
+                "quick-win",
+                "--runner",
+                "cli",
+                "--publish",
+                "--allow-dirty",
+                "--stage-command",
+                f"scout=python3 {py} scout",
+                "--stage-command",
+                f"gatekeeper=python3 {py} gatekeeper",
+                "--stage-command",
+                f"implement=python3 {py} implement {{{{PRSPEC_JSON}}}}",
+                "--stage-command",
+                f"reviewer=python3 {py} reviewer {{{{IMPLEMENT_RESULT_JSON}}}}",
+                "--stage-command",
+                f"pr_writer=python3 {py} pr_writer {{{{PRSPEC_JSON}}}}",
+                "--stage-command",
+                f"publish=python3 {py} publish {{{{QUALITY_GATE_JSON}}}}",
+            ]
+        )
+        base_sha = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(repo),
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        preflight = run_pipeline.PreflightResult(True, [], [], [], base_sha, "cli")
+
+        with mock.patch.object(run_pipeline, "run_preflight", return_value=preflight):
+            exit_code, payload = run_pipeline.run_pipeline(args)
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(payload["status"], "success")
+        proof = json.loads(publish_marker.read_text(encoding="utf-8"))
+        self.assertTrue(proof["ok"])
+
+        summary_payload = json.loads(Path(payload["data"]["pipeline_summary_path"]).read_text(encoding="utf-8"))
+        proof_entry = summary_payload["lineage"]["quality_gate_proofs"][0]
+        self.assertTrue(proof_entry["ok"])
+        self.assertTrue(Path(proof_entry["path"]).exists())
 
     def test_pipeline_summary_payload_is_validated(self):
         repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)

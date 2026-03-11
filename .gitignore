@@ -1,6 +1,7 @@
 docx/
 deepresearch/
 artifacts/
+.DS_Store
 .DS_Store/
 .claude/
 merge_markdown.py

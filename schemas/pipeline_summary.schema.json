@@ -57,7 +57,8 @@
         "report_path",
         "analysis_stage_payloads",
         "pr_specs",
-        "pr_stage_payloads"
+        "pr_stage_payloads",
+        "quality_gate_proofs"
       ],
       "properties": {
         "artifact_root": {
@@ -85,6 +86,24 @@
               "path": {
                 "type": "string",
                 "minLength": 1
+              },
+              "original_source": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "path", "sha256"],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-fA-F0-9]{64}$"
+                  }
+                }
               }
             }
           }
@@ -128,6 +147,45 @@
               "path": {
                 "type": "string",
                 "minLength": 1
+              },
+              "original_source": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "path", "sha256"],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-fA-F0-9]{64}$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "quality_gate_proofs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["index", "path", "ok"],
+            "properties": {
+              "index": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ok": {
+                "type": "boolean"
               }
             }
           }
