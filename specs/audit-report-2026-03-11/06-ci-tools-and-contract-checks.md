@@ -1,7 +1,7 @@
 # Spec 06: Add CI for tools and contract checks
 
 Источник:
-- [Audit Report.md](/Users/Apple/Developer/pr-factory-kit/Audit%20Report.md)
+- [Audit Report.md](../../Audit%20Report.md)
 - Section: `Top issues -> 8`
 - Section: `Best 7 -> 6`
 - Section: `System Upgrade Plan -> Foundation PRs`

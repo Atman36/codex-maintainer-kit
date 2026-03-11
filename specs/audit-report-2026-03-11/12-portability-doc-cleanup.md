@@ -1,12 +1,12 @@
 # Spec 12: Canonicalize portability-breaking docs and stale examples
 
 Источник:
-- [Audit Report.md](/Users/Apple/Developer/pr-factory-kit/Audit%20Report.md)
+- [Audit Report.md](../../Audit%20Report.md)
 - `AUDIT_SECOND_PASS_PROGRESS_2026-03-11.md`
 
 ## Why This Spec Exists
 
-Hardcoded `/Users/Apple/Developer/pr-factory-kit/analysis_report/...` paths still exist across prompts, skills, and docs. These are portability-breaking instructions for a harness repo and can mislead agents into treating one local machine layout as part of the contract.
+Hardcoded `<repo>/analysis_report/...` paths still exist across prompts, skills, and docs. These are portability-breaking instructions for a harness repo and can mislead agents into treating one local machine layout as part of the contract.
 
 The current tree still contains those paths in multiple files.
 
@@ -21,7 +21,7 @@ Touch only documentation and prompt text:
 - `prompts/README.md`
 - analysis-stage `SKILL.md` files
 - analysis-stage prompt files
-- related docs that still embed `/Users/Apple/Developer/pr-factory-kit/analysis_report/`
+- related docs that still embed machine-specific `analysis_report/` paths
 
 Avoid runner code changes in this spec.
 
@@ -36,7 +36,7 @@ Avoid runner code changes in this spec.
 
 ## Acceptance Criteria
 
-- Prompt and skill docs no longer hardcode `/Users/Apple/Developer/pr-factory-kit/analysis_report/`.
+- Prompt and skill docs no longer hardcode machine-specific `analysis_report/` paths.
 - Artifact-path guidance is portable and consistent.
 - No runtime behavior is changed in this slice.
 
@@ -45,7 +45,7 @@ Avoid runner code changes in this spec.
 Run exactly:
 
 ```bash
-rg -n "/Users/Apple/Developer/pr-factory-kit/analysis_report/" skills prompts README.md AGENTS.md tools specs FRAMEWORK_IMPROVEMENTS_2026-03-11.md
+rg -n "/Users/Apple/Developer/pr-factory-kit/analysis_report/" skills prompts README.md AGENTS.md tools FRAMEWORK_IMPROVEMENTS_2026-03-11.md
 python3 tools/validate_skills.py
 ```
 

@@ -1,7 +1,7 @@
 # Spec 05: Relax non-publish preflight for local-only analysis runs
 
 Источник:
-- [Audit Report.md](/Users/Apple/Developer/pr-factory-kit/Audit%20Report.md)
+- [Audit Report.md](../../Audit%20Report.md)
 - Section: `Top issues -> 4`
 - Section: `Best 7 -> 5`
 - Section: `Ready-to-Implement PR Specs -> PRSpec 5`

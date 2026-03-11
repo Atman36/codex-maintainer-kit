@@ -2,7 +2,7 @@
 
 Date: 2026-03-11
 
-Этот файл очищен от пунктов, уже перенесённых в [Audit Report.md](/Users/Apple/Developer/pr-factory-kit/Audit%20Report.md) и отдельные спеки в [specs/audit-report-2026-03-11/INDEX.md](/Users/Apple/Developer/pr-factory-kit/specs/audit-report-2026-03-11/INDEX.md).
+Этот файл очищен от пунктов, уже перенесённых в [Audit Report.md](Audit%20Report.md) и отдельные спеки в [specs/audit-report-2026-03-11/INDEX.md](specs/audit-report-2026-03-11/INDEX.md).
 
 Ниже оставлены только идеи, которые не дублируют аудит как отдельные задачи.
 

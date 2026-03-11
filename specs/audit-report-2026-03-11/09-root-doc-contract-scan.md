@@ -1,7 +1,7 @@
 # Spec 09: Scan root docs for contract drift and remove dead `{{CONTEXT}}`
 
 Источник:
-- [Audit Report.md](/Users/Apple/Developer/pr-factory-kit/Audit%20Report.md)
+- [Audit Report.md](../../Audit%20Report.md)
 - `AUDIT_SECOND_PASS_PROGRESS_2026-03-11.md`
 
 ## Why This Spec Exists

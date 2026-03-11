@@ -1,7 +1,7 @@
 # Spec 13: Rebalance Critic approvals and reduce Gatekeeper overlap
 
 Источник:
-- [Audit Report.md](/Users/Apple/Developer/pr-factory-kit/Audit%20Report.md)
+- [Audit Report.md](../../Audit%20Report.md)
 
 ## Why This Spec Exists
 

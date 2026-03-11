@@ -1,7 +1,7 @@
 # Spec 04: Validate stage payloads against `ExecutionResult` and `PRSpec` schemas at runtime
 
 Источник:
-- [Audit Report.md](/Users/Apple/Developer/pr-factory-kit/Audit%20Report.md)
+- [Audit Report.md](../../Audit%20Report.md)
 - Section: `Top issues -> 2`
 - Section: `Best 7 -> 4`
 - Section: `Ready-to-Implement PR Specs -> PRSpec 4`

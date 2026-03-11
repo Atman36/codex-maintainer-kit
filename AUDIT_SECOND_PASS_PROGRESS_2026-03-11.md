@@ -18,7 +18,7 @@ Commands run from repo root on 2026-03-11:
 - `. .tmp-editable-verify/bin/activate && python3 -m pip install -e .`
 - `. .tmp-editable-verify/bin/activate && python3 tools/validate_skills.py`
 - `. .tmp-editable-verify/bin/activate && python3 -m unittest discover -s tools/tests -p 'test_*.py'`
-- `rg -n "/Users/Apple/Developer/pr-factory-kit/analysis_report/" skills prompts README.md AGENTS.md tools specs FRAMEWORK_IMPROVEMENTS_2026-03-11.md`
+- `rg -n "/Users/Apple/Developer/pr-factory-kit/analysis_report/" skills prompts README.md AGENTS.md tools FRAMEWORK_IMPROVEMENTS_2026-03-11.md`
 - `rg -n "low-risk|approve|scope minimization|strategic" prompts/agent-critic.md skills/pr-factory-critic/SKILL.md prompts/gatekeeper.md skills/pr-factory-gatekeeper/SKILL.md`
 - targeted source checks against `tools/run_pipeline.py`, `tools/contract_registry.py`, `README.md`
 
@@ -33,6 +33,7 @@ Confirmed done:
 - Editable-install packaging metadata is now present via `pyproject.toml` with minimal setuptools config for `tools/pr_factory_lib`.
 - Pipeline runs now emit a first-class `run_id` and persist machine-readable lineage for stage payloads and extracted PRSpecs.
 - Pipeline mode analysis graphs now load from `config/pipeline_modes.json` with early validation for missing or invalid config.
+- Remaining portability drift in root operating docs was cleaned up: `AGENTS.md` no longer hardcodes the local workspace path, root/spec links are repo-relative, and `tools/README.md` no longer relies on shell-specific `<(echo ...)` schema examples.
 
 Confirmed still open:
 - Optional packaging follow-up: broader editable-install follow-through and repo packaging cleanup beyond the minimal `pyproject.toml`.

@@ -8,7 +8,7 @@
 
 The remaining portability problem is not only docs wording. Analysis-stage prompts and skills still instruct agents to write JSON into a machine-specific path:
 
-`/Users/Apple/Developer/pr-factory-kit/analysis_report/...`
+`<repo>/analysis_report/...`
 
 That path is not portable, and it is still embedded in the operating contract. The second-pass audit explicitly recommends replacing it with `REPORT_PATH` or `ARTIFACT_DIR` and letting the runtime inject the actual location.
 
@@ -29,12 +29,12 @@ Touch only:
 
 - Add canonical placeholder support for `ARTIFACT_DIR` if `REPORT_PATH` is too narrow.
 - Inject the chosen artifact path from the runner with a stable default such as repo-relative `analysis_report/`.
-- Replace hardcoded `/Users/Apple/Developer/pr-factory-kit/analysis_report/...` strings in analysis prompts/skills with the placeholder-driven form.
+- Replace hardcoded `<repo>/analysis_report/...` strings in analysis prompts/skills with the placeholder-driven form.
 - Keep backward-compatible behavior for existing local runs.
 
 ## Acceptance Criteria
 
-- No analysis-stage prompt or skill hardcodes `/Users/Apple/Developer/pr-factory-kit/analysis_report/`.
+- No analysis-stage prompt or skill hardcodes machine-specific `analysis_report/` paths.
 - Runner can expand the portable artifact placeholder during stage command construction.
 - Default artifact directory remains deterministic and local-run friendly.
 
@@ -43,7 +43,7 @@ Touch only:
 Run exactly:
 
 ```bash
-rg -n "/Users/Apple/Developer/pr-factory-kit/analysis_report/" skills prompts README.md AGENTS.md tools specs FRAMEWORK_IMPROVEMENTS_2026-03-11.md
+rg -n "/Users/Apple/Developer/pr-factory-kit/analysis_report/" skills prompts README.md AGENTS.md tools FRAMEWORK_IMPROVEMENTS_2026-03-11.md
 python3 tools/validate_skills.py
 python3 -m unittest discover -s tools/tests -p 'test_*.py'
 ```

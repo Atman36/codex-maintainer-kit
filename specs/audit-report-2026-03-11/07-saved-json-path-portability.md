@@ -1,7 +1,7 @@
 # Spec 07: Support quoted and space-containing `SAVED_JSON_PATH` values
 
 Источник:
-- [Audit Report.md](/Users/Apple/Developer/pr-factory-kit/Audit%20Report.md)
+- [Audit Report.md](../../Audit%20Report.md)
 - Section: `Top issues -> 3`
 - Section: `Best 7 -> 7`
 
