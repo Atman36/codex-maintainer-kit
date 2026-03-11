@@ -24,3 +24,4 @@ Role-specific payload goes into `ExecutionResult.data`.
 ## User Templates
 - `prompts/user-pipeline-full.md` — готовый текст запроса для full pipeline (до PR Writer, без публикации по умолчанию).
 - `prompts/user-analysis-only.md` — “только анализ” (без изменений кода) + отчёт в отдельном файле.
+- `prompts/user-framework-audit.md` — глубокий аудит самого PR Factory Kit как agent framework / harness.
