@@ -112,6 +112,9 @@ Validates integrity of local skill packages in `skills/`.
 1. `SKILL.md` exists for each skill
 2. `SKILL.md` includes frontmatter with required keys (`name`, `description`)
 3. `metadata.json` exists, is valid JSON, and includes `version`
+4. PR Factory prompts, skills, and docs use only placeholders from [`tools/contract_registry.py`](./contract_registry.py)
+5. Legacy placeholder aliases are reported explicitly as warnings
+6. Metadata `*_JSON` inputs are declared as `type: "string"` because runtime passes file paths, not embedded objects
 
 ### Usage
 
@@ -124,6 +127,12 @@ Optional root override:
 ```bash
 python tools/validate_skills.py --root /path/to/repo
 ```
+
+Validation policy:
+
+- Unknown placeholders fail validation.
+- Legacy aliases such as `{{IMPLEMENT_RESULT_JSON}}` and `{{CANDIDATES_JSON}}` warn but do not fail by themselves.
+- Metadata entries like `IMPLEMENT_RESULT_JSON` / `PRSPEC_JSON` / `SCOUT_JSON` fail if they claim `type: "object"`.
 
 ### Exit Codes
 

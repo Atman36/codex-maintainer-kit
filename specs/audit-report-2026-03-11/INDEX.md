@@ -11,8 +11,8 @@
 
 | Spec | Title | Status | Done At | Commit | What Was Done |
 | --- | --- | --- | --- | --- | --- |
-| 01 | Fix `quality_gate.py` autoclean crash and add regression tests | todo |  |  |  |
-| 02 | Add placeholder registry and static contract validator | todo |  |  |  |
+| 01 | Fix `quality_gate.py` autoclean crash and add regression tests | done | 2026-03-11 | 304edf3 | Repaired autoclean subprocess calls and added tracked/untracked regression coverage. |
+| 02 | Add placeholder registry and static contract validator | done | 2026-03-11 | same commit | Added canonical placeholder registry, contract validation, metadata path-type checks, and regression tests. |
 | 03 | Add runner placeholder aliases and unresolved-placeholder preflight | todo |  |  |  |
 | 04 | Validate stage payloads against `ExecutionResult` and `PRSpec` schemas at runtime | todo |  |  |  |
 | 05 | Relax non-publish preflight for local-only analysis runs | todo |  |  |  |

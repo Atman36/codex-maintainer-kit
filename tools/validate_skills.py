@@ -17,6 +17,12 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+TOOLS_DIR = Path(__file__).resolve().parent
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
+from contract_registry import collect_contract_issues  # noqa: E402
+
 FRONTMATTER_REQUIRED_KEYS = ("name", "description")
 FRONTMATTER_KEY_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*\s*:")
 
@@ -104,13 +110,23 @@ def validate_skills(root_dir: Path) -> int:
 
     print(f"Scanning skills in {skills_dir}...")
     results = [_validate_skill_dir(skill_dir) for skill_dir in skill_dirs]
+    contract_issues = collect_contract_issues(root_dir)
+    contract_errors = [issue for issue in contract_issues if issue.severity == "error"]
+    contract_warnings = [issue for issue in contract_issues if issue.severity == "warning"]
 
     errors = [result for result in results if result.errors]
-    if errors:
+    if contract_warnings:
+        print("\nContract warnings:")
+        for issue in contract_warnings:
+            print(f" - [{issue.path.relative_to(root_dir)}] {issue.message}")
+
+    if errors or contract_errors:
         print("\nValidation failed:")
         for result in errors:
             for error in result.errors:
                 print(f" - [{result.skill_name}] {error}")
+        for issue in contract_errors:
+            print(f" - [{issue.path.relative_to(root_dir)}] {issue.message}")
         return 1
 
     print(f"\nAll {len(results)} skills validated successfully.")
