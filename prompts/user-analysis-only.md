@@ -7,7 +7,8 @@
 - Используй контекст выборочно: только факты, влияющие на риск, scope, стиль и требования к PR.
 
 Режим:
-- `MODE`: `full` (но остановиться до Implementer/Publisher)
+- `MODE`: `full`
+- Runner запускается в `--analysis-only` (эквивалентно `--stop-after gatekeeper`)
 - `BASE_BRANCH`: `main`
 - `MAX_PRS`: `1`
 
@@ -29,4 +30,4 @@
 - Верни **только JSON** по `schemas/execution_result.schema.json`.
 - `stage` = `pipeline`, `status` = `success|needs_human|failed`.
 - В `artifacts` добавь запись про отчёт: `{ "kind": "report", "path": "{{REPORT_PATH}}" }` (только если файл реально создан).
-- В `data` включи: `pipeline_mode`, `stage_summary[]`, `top_improvements[]`, `selected_prspec`, `final_pr_message` (может быть пустым), `report_path`.
+- В `data` включи: `pipeline_mode`, `stage_summary[]`, `top_improvements[]`, `selected_prspec`, `selected_prspecs[]`, `final_pr_message` (может быть пустым), `report_path`.

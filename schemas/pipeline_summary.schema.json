@@ -54,6 +54,7 @@
       "required": [
         "artifact_root",
         "summary_path",
+        "report_path",
         "analysis_stage_payloads",
         "pr_specs",
         "pr_stage_payloads"
@@ -64,6 +65,10 @@
           "minLength": 1
         },
         "summary_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "report_path": {
           "type": "string",
           "minLength": 1
         },

@@ -41,6 +41,17 @@ IMPLEMENTATION_STAGES: List[str] = ["implement", "reviewer", "pr_writer"]
 DEFAULT_PIPELINE_MODES_CONFIG_PATH = TOOLS_DIR.parent / "config" / "pipeline_modes.json"
 REQUIRED_PIPELINE_MODES: Tuple[str, ...] = ("full", "quick-win", "architecture")
 ALLOWED_ANALYSIS_STAGES = frozenset({"scout", "analyst", "architect", "critic", "gatekeeper"})
+STOP_AFTER_STAGES: Tuple[str, ...] = (
+    "scout",
+    "analyst",
+    "architect",
+    "critic",
+    "gatekeeper",
+    "implement",
+    "reviewer",
+    "pr_writer",
+    "publish",
+)
 PLACEHOLDER_ALIAS_PREFERENCES: Dict[str, Tuple[str, ...]] = {
     "CANDIDATES_JSON": ("ANALYST_JSON", "ARCHITECT_JSON", "SCOUT_JSON"),
     "IMPLEMENT_RESULT_JSON": ("IMPLEMENT_JSON",),
@@ -165,6 +176,14 @@ def run_artifact_dir(repo_root: Path, run_id: str) -> Path:
 
 def default_report_path(repo_root: Path, run_id: str) -> Path:
     return run_artifact_dir(repo_root, run_id) / "report.md"
+
+
+def default_analysis_artifact_dir(repo_root: Path, run_id: str) -> Path:
+    return run_artifact_dir(repo_root, run_id) / "analysis"
+
+
+def default_pr_artifact_dir(repo_root: Path, run_id: str, pr_index: int) -> Path:
+    return run_artifact_dir(repo_root, run_id) / "prs" / f"pr-{pr_index}"
 
 
 @lru_cache(maxsize=None)
@@ -881,6 +900,17 @@ def execute_stage_with_retries(
     return final_run, attempt, retry_trace
 
 
+def _build_pipeline_artifacts(summary_path: str = "", report_path: str = "") -> List[Dict[str, str]]:
+    artifacts: List[Dict[str, str]] = []
+    if summary_path:
+        artifacts.append({"kind": "pipeline_summary", "path": summary_path})
+    if report_path:
+        report_candidate = Path(report_path)
+        if report_candidate.exists():
+            artifacts.append({"kind": "report", "path": str(report_candidate)})
+    return artifacts
+
+
 def make_failure_result(
     started_at: str,
     mode: str,
@@ -897,9 +927,14 @@ def make_failure_result(
     summary_path: str = "",
     lineage: Optional[Dict[str, Any]] = None,
     final_pr_spec: Optional[Dict[str, Any]] = None,
+    selected_pr_specs: Optional[List[Dict[str, Any]]] = None,
+    report_path: str = "",
 ) -> Dict[str, Any]:
     pr_results = pr_results or []
+    selected_pr_specs = selected_pr_specs or []
     first_pr_spec = final_pr_spec or {}
+    if not first_pr_spec and selected_pr_specs:
+        first_pr_spec = selected_pr_specs[0]
     pipeline_id = pipeline_id_for_run(run_id)
     lineage = lineage or {}
 
@@ -921,7 +956,7 @@ def make_failure_result(
         "exit_code": 1,
         "stdout": "",
         "stderr": "\n".join(errors),
-        "artifacts": [{"kind": "pipeline_summary", "path": summary_path}] if summary_path else [],
+        "artifacts": _build_pipeline_artifacts(summary_path=summary_path, report_path=report_path),
         "metrics": {
             "duration_ms": 0,
             "cost_usd": 0.0,
@@ -938,9 +973,17 @@ def make_failure_result(
             "stage_summary": stage_summaries,
             "top_improvements": top_improvements,
             "selected_prspec": first_pr_spec if isinstance(first_pr_spec, dict) else {},
-            "selected_prspecs": [r.get("pr_spec", {}) for r in pr_results if isinstance(r, dict)],
+            "selected_prspecs": [
+                item
+                for item in (
+                    [r.get("pr_spec", {}) for r in pr_results if isinstance(r, dict)]
+                    or selected_pr_specs
+                )
+                if isinstance(item, dict)
+            ],
             "final_pr_message": final_pr_message,
             "pr_results": pr_results,
+            "report_path": report_path,
             "preflight": {
                 "checks": [
                     {
@@ -1011,7 +1054,37 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         default="",
         help="Write machine-readable pipeline summary JSON to this file.",
     )
+    parser.add_argument(
+        "--analysis-only",
+        action="store_true",
+        help="Run analysis stages only and stop after gatekeeper.",
+    )
+    parser.add_argument(
+        "--stop-after",
+        choices=STOP_AFTER_STAGES,
+        default="",
+        help="Stop the pipeline after the specified stage succeeds.",
+    )
     return parser.parse_args(argv)
+
+
+def _resolve_stop_after(args: argparse.Namespace) -> str:
+    if args.analysis_only:
+        if args.stop_after and args.stop_after != "gatekeeper":
+            raise ValueError("--analysis-only is equivalent to --stop-after gatekeeper.")
+        if args.publish:
+            raise ValueError("--analysis-only cannot be combined with --publish.")
+        return "gatekeeper"
+    return args.stop_after.strip()
+
+
+def _slice_required_stages(stage_order: List[str], stop_after_stage: str) -> List[str]:
+    if not stop_after_stage:
+        return list(stage_order)
+    if stop_after_stage not in stage_order:
+        return []
+    stop_index = stage_order.index(stop_after_stage)
+    return stage_order[: stop_index + 1]
 
 
 def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
@@ -1081,10 +1154,60 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
         )
         return 1, result
 
+    try:
+        stop_after_stage = _resolve_stop_after(args)
+    except ValueError as exc:
+        error = StructuredError(
+            reason=str(exc),
+            failed_stage="preflight",
+            next_action="Adjust --analysis-only/--stop-after flags and rerun.",
+        )
+        result = make_failure_result(
+            started_at=started_at,
+            mode=args.mode,
+            run_id=run_id,
+            stage_summaries=[],
+            top_improvements=[],
+            message="Invalid stop configuration",
+            errors=[error.as_text()],
+            warnings=[],
+            error_blocks=[error],
+            runner_selected="",
+            preflight_checks=[],
+        )
+        return 1, result
+
     analysis_stage_order = mode_analysis_stage_order[args.mode]
-    required_stages = analysis_stage_order + IMPLEMENTATION_STAGES
+    full_stage_order = analysis_stage_order + IMPLEMENTATION_STAGES
     if args.publish:
-        required_stages.append("publish")
+        full_stage_order.append("publish")
+
+    if stop_after_stage and stop_after_stage not in full_stage_order:
+        error = StructuredError(
+            reason=(
+                f"Stage '{stop_after_stage}' is not available in mode '{args.mode}'"
+                + (" with publish disabled." if stop_after_stage == "publish" else ".")
+            ),
+            failed_stage="preflight",
+            next_action="Choose a stop stage present in this mode, or enable --publish when stopping after publish.",
+        )
+        result = make_failure_result(
+            started_at=started_at,
+            mode=args.mode,
+            run_id=run_id,
+            stage_summaries=[],
+            top_improvements=[],
+            message="Invalid stop configuration",
+            errors=[error.as_text()],
+            warnings=[],
+            error_blocks=[error],
+            runner_selected="",
+            preflight_checks=[],
+        )
+        return 1, result
+
+    required_stages = _slice_required_stages(full_stage_order, stop_after_stage)
+    implementation_requested = any(stage in IMPLEMENTATION_STAGES or stage == "publish" for stage in required_stages)
 
     try:
         runner_adapter, runner_warnings = select_runner(args.runner, args.task_runner_cmd, repo_root)
@@ -1169,9 +1292,12 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
     pr_stage_lineage: List[Dict[str, Any]] = []
     artifact_root = run_artifact_dir(repo_root, run_id)
     report_path = default_report_path(repo_root, run_id)
+    analysis_artifact_dir = default_analysis_artifact_dir(repo_root, run_id)
 
     with tempfile.TemporaryDirectory(prefix="pr-factory-") as tmp_dir:
         tmp = Path(tmp_dir)
+        analysis_artifact_dir.mkdir(parents=True, exist_ok=True)
+        report_path.parent.mkdir(parents=True, exist_ok=True)
         template_values: Dict[str, str] = {
             "REPO_ROOT": str(repo_root),
             "REPO_URL": args.repo_url,
@@ -1181,7 +1307,7 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
             "MODE": args.mode,
             "MAX_PRS": str(args.max_prs),
             "TEMP_DIR": str(tmp),
-            "ARTIFACT_DIR": str(default_artifact_dir(repo_root)),
+            "ARTIFACT_DIR": str(analysis_artifact_dir),
             "REPORT_PATH": str(report_path),
             "RUNNER": runner_adapter.name,
         }
@@ -1239,7 +1365,7 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
                 stage_summaries.append(summary)
                 break
 
-            payload_path = artifact_root / "analysis" / f"{stage}.json"
+            payload_path = analysis_artifact_dir / f"{stage}.json"
             payload = persist_stage_payload(
                 run_result.payload,
                 path=payload_path,
@@ -1274,11 +1400,12 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
                 break
 
         pr_results: List[Dict[str, Any]] = []
+        selected_pr_specs: List[Dict[str, Any]] = []
 
         if not errors:
             gatekeeper_payload = analysis_stage_payloads.get("gatekeeper", {})
             extracted_pr_specs = extract_pr_specs(gatekeeper_payload)
-            if not extracted_pr_specs:
+            if not extracted_pr_specs and "gatekeeper" in analysis_stage_payloads:
                 error = StructuredError(
                     reason="Gatekeeper approved PR flow but did not provide pr_spec/pr_specs.",
                     failed_stage="gatekeeper",
@@ -1286,259 +1413,267 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
                 )
                 error_blocks.append(error)
                 errors.append(error.as_text())
-            else:
+            elif extracted_pr_specs:
                 max_prs = max(1, int(args.max_prs))
-                extracted_pr_specs = extracted_pr_specs[:max_prs]
-
-                for index, raw_pr_spec in enumerate(extracted_pr_specs, start=1):
-                    normalized_pr_spec = normalize_pr_spec(
+                selected_pr_specs = [
+                    normalize_pr_spec(
                         raw_pr_spec=raw_pr_spec,
                         index=index,
                         base_branch=args.base_branch,
                         repo_url=args.repo_url,
                     )
+                    for index, raw_pr_spec in enumerate(extracted_pr_specs[:max_prs], start=1)
+                ]
 
-                    pr_stage_payloads: Dict[str, Dict[str, Any]] = {}
-                    pr_stage_summaries: List[Dict[str, Any]] = []
-                    pr_errors: List[StructuredError] = []
-                    pr_warnings: List[str] = []
-                    pr_retry_trace: List[Dict[str, Any]] = []
-                    base_sha_at_publish = ""
+                if implementation_requested:
+                    for index, normalized_pr_spec in enumerate(selected_pr_specs, start=1):
+                        pr_stage_payloads: Dict[str, Dict[str, Any]] = {}
+                        pr_stage_summaries: List[Dict[str, Any]] = []
+                        pr_errors: List[StructuredError] = []
+                        pr_warnings: List[str] = []
+                        pr_retry_trace: List[Dict[str, Any]] = []
+                        base_sha_at_publish = ""
 
-                    pr_dir = artifact_root / "prs" / f"pr-{index}"
-                    pr_dir.mkdir(parents=True, exist_ok=True)
-                    prspec_path = pr_dir / "prspec.json"
-                    write_json(prspec_path, normalized_pr_spec)
-                    pr_spec_lineage.append(
-                        {
-                            "index": index,
-                            "id": normalized_pr_spec.get("id", f"prspec-{index}"),
-                            "path": str(prspec_path),
-                        }
-                    )
+                        pr_dir = default_pr_artifact_dir(repo_root, run_id, index)
+                        pr_dir.mkdir(parents=True, exist_ok=True)
+                        prspec_path = pr_dir / "prspec.json"
+                        write_json(prspec_path, normalized_pr_spec)
+                        pr_spec_lineage.append(
+                            {
+                                "index": index,
+                                "id": normalized_pr_spec.get("id", f"prspec-{index}"),
+                                "path": str(prspec_path),
+                            }
+                        )
 
-                    per_pr_template_values = dict(template_values)
-                    per_pr_template_values.update(
-                        {
-                            "PR_INDEX": str(index),
-                            "PRSPEC_JSON": str(prspec_path),
-                            "HEAD_BRANCH": str(
-                                ((normalized_pr_spec.get("head") or {}).get("branch") if isinstance(normalized_pr_spec.get("head"), dict) else "")
-                                or ""
-                            ),
-                        }
-                    )
+                        per_pr_template_values = dict(template_values)
+                        per_pr_template_values.update(
+                            {
+                                "PR_INDEX": str(index),
+                                "PRSPEC_JSON": str(prspec_path),
+                                "HEAD_BRANCH": str(
+                                    ((normalized_pr_spec.get("head") or {}).get("branch") if isinstance(normalized_pr_spec.get("head"), dict) else "")
+                                    or ""
+                                ),
+                                "ARTIFACT_DIR": str(pr_dir),
+                            }
+                        )
 
-                    pr_stage_order = list(IMPLEMENTATION_STAGES)
-                    if args.publish:
-                        pr_stage_order.append("publish")
+                        pr_stage_order = [stage for stage in IMPLEMENTATION_STAGES if stage in required_stages]
+                        if "publish" in required_stages:
+                            pr_stage_order.append("publish")
 
-                    for stage in pr_stage_order:
-                        for previous_stage, path in analysis_stage_paths.items():
-                            per_pr_template_values[f"{previous_stage.upper()}_JSON"] = path
+                        for stage in pr_stage_order:
+                            for previous_stage, path in analysis_stage_paths.items():
+                                per_pr_template_values[f"{previous_stage.upper()}_JSON"] = path
 
-                        for previous_stage, payload in pr_stage_payloads.items():
-                            path = pr_dir / f"{previous_stage}.json"
-                            persisted_payload = persist_stage_payload(
-                                payload,
-                                path=path,
+                            for previous_stage, payload in pr_stage_payloads.items():
+                                path = pr_dir / f"{previous_stage}.json"
+                                persisted_payload = persist_stage_payload(
+                                    payload,
+                                    path=path,
+                                    run_id=run_id,
+                                    artifact_root=artifact_root,
+                                    lineage={
+                                        "stage": previous_stage,
+                                        "pipeline_mode": args.mode,
+                                        "pr_index": index,
+                                        "prspec_path": str(prspec_path),
+                                    },
+                                )
+                                pr_stage_payloads[previous_stage] = persisted_payload
+                                per_pr_template_values[f"{previous_stage.upper()}_JSON"] = str(path)
+
+                            if stage == "publish":
+                                try:
+                                    current_base_sha, _ = resolve_base_sha(
+                                        repo_root=repo_root,
+                                        base_branch=args.base_branch,
+                                        allow_local_fallback=False,
+                                    )
+                                    base_sha_at_publish = current_base_sha
+                                except ValueError as exc:
+                                    pr_errors.append(
+                                        StructuredError(
+                                            reason=str(exc),
+                                            failed_stage="publish",
+                                            next_action=f"Run `git fetch origin {args.base_branch}` and retry publish.",
+                                        )
+                                    )
+                                    break
+
+                                if preflight.base_sha_at_start and base_sha_at_publish != preflight.base_sha_at_start:
+                                    drift_msg = (
+                                        f"Base drift detected for PR #{index}: start={preflight.base_sha_at_start}, "
+                                        f"publish={base_sha_at_publish}"
+                                    )
+                                    if args.base_drift_policy == "needs_human":
+                                        pr_errors.append(
+                                            StructuredError(
+                                                reason=drift_msg,
+                                                failed_stage="publish",
+                                                next_action=(
+                                                    f"Rebase/cherry-pick on latest origin/{args.base_branch} and rerun publish."
+                                                ),
+                                            )
+                                        )
+                                        break
+                                    if args.base_drift_policy == "warn":
+                                        pr_warnings.append(drift_msg)
+
+                            max_attempts = args.implement_max_attempts if stage == "implement" else 1
+                            run_result, attempts, retry_trace = execute_stage_with_retries(
+                                adapter=runner_adapter,
+                                stage=stage,
+                                command_template=stage_commands[stage],
+                                cwd=repo_root,
+                                template_values=per_pr_template_values,
+                                max_attempts=max_attempts,
+                            )
+                            total_elapsed_ms += run_result.elapsed_ms
+                            if attempts > 1:
+                                retries += attempts - 1
+                            pr_retry_trace.extend(retry_trace)
+
+                            stage_summary = {
+                                "stage": stage,
+                                "command": run_result.command,
+                                "runner": run_result.runner,
+                                "exit_code": run_result.exit_code,
+                                "elapsed_ms": run_result.elapsed_ms,
+                                "attempts": attempts,
+                                "status": "",
+                                "retry_trace": retry_trace,
+                            }
+
+                            if run_result.exit_code != 0:
+                                reason = run_result.stderr.strip() or run_result.stdout.strip() or f"Stage {stage} failed"
+                                pr_errors.append(
+                                    StructuredError(
+                                        reason=reason,
+                                        failed_stage=stage,
+                                        next_action=f"Fix stage output/command for '{stage}' and rerun this PRSpec.",
+                                    )
+                                )
+                                stage_summary["status"] = "failed"
+                                pr_stage_summaries.append(stage_summary)
+                                break
+
+                            if run_result.payload is None:
+                                pr_errors.append(
+                                    StructuredError(
+                                        reason="missing JSON payload",
+                                        failed_stage=stage,
+                                        next_action="Ensure stage prints valid JSON output.",
+                                    )
+                                )
+                                stage_summary["status"] = "failed"
+                                pr_stage_summaries.append(stage_summary)
+                                break
+
+                            payload_path = pr_dir / f"{stage}.json"
+                            payload = persist_stage_payload(
+                                run_result.payload,
+                                path=payload_path,
                                 run_id=run_id,
                                 artifact_root=artifact_root,
                                 lineage={
-                                    "stage": previous_stage,
+                                    "stage": stage,
                                     "pipeline_mode": args.mode,
                                     "pr_index": index,
                                     "prspec_path": str(prspec_path),
                                 },
                             )
-                            pr_stage_payloads[previous_stage] = persisted_payload
-                            per_pr_template_values[f"{previous_stage.upper()}_JSON"] = str(path)
+                            stage_summary["status"] = stage_status(payload)
+                            stage_summary["payload_path"] = str(payload_path)
+                            pr_stage_summaries.append(stage_summary)
+                            pr_stage_payloads[stage] = payload
+                            pr_stage_lineage.append({"index": index, "stage": stage, "path": str(payload_path)})
 
-                        if stage == "publish":
-                            try:
-                                current_base_sha, _ = resolve_base_sha(
-                                    repo_root=repo_root,
-                                    base_branch=args.base_branch,
-                                    allow_local_fallback=False,
-                                )
-                                base_sha_at_publish = current_base_sha
-                            except ValueError as exc:
+                            gate_msg = gate_failed(stage, payload)
+                            if gate_msg:
                                 pr_errors.append(
                                     StructuredError(
-                                        reason=str(exc),
-                                        failed_stage="publish",
-                                        next_action=f"Run `git fetch origin {args.base_branch}` and retry publish.",
+                                        reason=gate_msg,
+                                        failed_stage=stage,
+                                        next_action=f"Address '{stage}' findings and retry this PRSpec.",
                                     )
                                 )
                                 break
 
-                            if preflight.base_sha_at_start and base_sha_at_publish != preflight.base_sha_at_start:
-                                drift_msg = (
-                                    f"Base drift detected for PR #{index}: start={preflight.base_sha_at_start}, "
-                                    f"publish={base_sha_at_publish}"
-                                )
-                                if args.base_drift_policy == "needs_human":
-                                    pr_errors.append(
-                                        StructuredError(
-                                            reason=drift_msg,
-                                            failed_stage="publish",
-                                            next_action=(
-                                                f"Rebase/cherry-pick on latest origin/{args.base_branch} and rerun publish."
-                                            ),
-                                        )
+                            if stage == "pr_writer":
+                                maybe_final = payload.get("pr_spec")
+                                if isinstance(maybe_final, dict) and maybe_final:
+                                    normalized_pr_spec = normalize_pr_spec(
+                                        raw_pr_spec=maybe_final,
+                                        index=index,
+                                        base_branch=args.base_branch,
+                                        repo_url=args.repo_url,
                                     )
-                                    break
-                                if args.base_drift_policy == "warn":
-                                    pr_warnings.append(drift_msg)
+                                    selected_pr_specs[index - 1] = normalized_pr_spec
+                                    write_json(prspec_path, normalized_pr_spec)
+                                    per_pr_template_values["PRSPEC_JSON"] = str(prspec_path)
+                                    per_pr_template_values["HEAD_BRANCH"] = str(
+                                        ((normalized_pr_spec.get("head") or {}).get("branch") if isinstance(normalized_pr_spec.get("head"), dict) else "")
+                                        or ""
+                                    )
 
-                        max_attempts = args.implement_max_attempts if stage == "implement" else 1
-                        run_result, attempts, retry_trace = execute_stage_with_retries(
-                            adapter=runner_adapter,
-                            stage=stage,
-                            command_template=stage_commands[stage],
-                            cwd=repo_root,
-                            template_values=per_pr_template_values,
-                            max_attempts=max_attempts,
+                        pr_status = "success" if not pr_errors else "needs_human"
+                        publish_payload = pr_stage_payloads.get("publish", {})
+                        pr_url = ""
+                        if isinstance(publish_payload, dict):
+                            data = publish_payload.get("data", {})
+                            if isinstance(data, dict):
+                                pr_data = data.get("pr", {})
+                                if isinstance(pr_data, dict):
+                                    pr_url = str(pr_data.get("url") or "")
+
+                        final_pr_message: Dict[str, Any] = {}
+                        title = normalized_pr_spec.get("title")
+                        body_markdown = normalized_pr_spec.get("body_markdown")
+                        if isinstance(title, str) and isinstance(body_markdown, str):
+                            final_pr_message = {"title": title, "body_markdown": body_markdown}
+
+                        pr_results.append(
+                            {
+                                "index": index,
+                                "id": normalized_pr_spec.get("id", f"prspec-{index}"),
+                                "status": pr_status,
+                                "stage_summary": pr_stage_summaries,
+                                "errors": [e.as_text() for e in pr_errors],
+                                "warnings": pr_warnings,
+                                "retry_trace": pr_retry_trace,
+                                "pr_spec": normalized_pr_spec,
+                                "final_pr_message": final_pr_message,
+                                "publish": {
+                                    "requested": bool(args.publish),
+                                    "url": pr_url,
+                                },
+                                "lineage": {
+                                    "prspec_path": str(prspec_path),
+                                    "stage_payloads": [item for item in pr_stage_lineage if item.get("index") == index],
+                                },
+                                "base_sha_at_start": preflight.base_sha_at_start,
+                                "base_sha_at_publish": base_sha_at_publish,
+                            }
                         )
-                        total_elapsed_ms += run_result.elapsed_ms
-                        if attempts > 1:
-                            retries += attempts - 1
-                        pr_retry_trace.extend(retry_trace)
 
-                        stage_summary = {
-                            "stage": stage,
-                            "command": run_result.command,
-                            "runner": run_result.runner,
-                            "exit_code": run_result.exit_code,
-                            "elapsed_ms": run_result.elapsed_ms,
-                            "attempts": attempts,
-                            "status": "",
-                            "retry_trace": retry_trace,
-                        }
-
-                        if run_result.exit_code != 0:
-                            reason = run_result.stderr.strip() or run_result.stdout.strip() or f"Stage {stage} failed"
-                            pr_errors.append(
-                                StructuredError(
-                                    reason=reason,
-                                    failed_stage=stage,
-                                    next_action=f"Fix stage output/command for '{stage}' and rerun this PRSpec.",
-                                )
-                            )
-                            stage_summary["status"] = "failed"
-                            pr_stage_summaries.append(stage_summary)
-                            break
-
-                        if run_result.payload is None:
-                            pr_errors.append(
-                                StructuredError(
-                                    reason="missing JSON payload",
-                                    failed_stage=stage,
-                                    next_action="Ensure stage prints valid JSON output.",
-                                )
-                            )
-                            stage_summary["status"] = "failed"
-                            pr_stage_summaries.append(stage_summary)
-                            break
-
-                        payload_path = pr_dir / f"{stage}.json"
-                        payload = persist_stage_payload(
-                            run_result.payload,
-                            path=payload_path,
-                            run_id=run_id,
-                            artifact_root=artifact_root,
-                            lineage={
-                                "stage": stage,
-                                "pipeline_mode": args.mode,
-                                "pr_index": index,
-                                "prspec_path": str(prspec_path),
-                            },
-                        )
-                        stage_summary["status"] = stage_status(payload)
-                        stage_summary["payload_path"] = str(payload_path)
-                        pr_stage_summaries.append(stage_summary)
-                        pr_stage_payloads[stage] = payload
-                        pr_stage_lineage.append({"index": index, "stage": stage, "path": str(payload_path)})
-
-                        gate_msg = gate_failed(stage, payload)
-                        if gate_msg:
-                            pr_errors.append(
-                                StructuredError(
-                                    reason=gate_msg,
-                                    failed_stage=stage,
-                                    next_action=f"Address '{stage}' findings and retry this PRSpec.",
-                                )
-                            )
-                            break
-
-                        if stage == "pr_writer":
-                            maybe_final = payload.get("pr_spec")
-                            if isinstance(maybe_final, dict) and maybe_final:
-                                normalized_pr_spec = normalize_pr_spec(
-                                    raw_pr_spec=maybe_final,
-                                    index=index,
-                                    base_branch=args.base_branch,
-                                    repo_url=args.repo_url,
-                                )
-                                write_json(prspec_path, normalized_pr_spec)
-                                per_pr_template_values["PRSPEC_JSON"] = str(prspec_path)
-                                per_pr_template_values["HEAD_BRANCH"] = str(
-                                    ((normalized_pr_spec.get("head") or {}).get("branch") if isinstance(normalized_pr_spec.get("head"), dict) else "")
-                                    or ""
-                                )
-
-                    pr_status = "success" if not pr_errors else "needs_human"
-                    publish_payload = pr_stage_payloads.get("publish", {})
-                    pr_url = ""
-                    if isinstance(publish_payload, dict):
-                        data = publish_payload.get("data", {})
-                        if isinstance(data, dict):
-                            pr_data = data.get("pr", {})
-                            if isinstance(pr_data, dict):
-                                pr_url = str(pr_data.get("url") or "")
-
-                    final_pr_message: Dict[str, Any] = {}
-                    title = normalized_pr_spec.get("title")
-                    body_markdown = normalized_pr_spec.get("body_markdown")
-                    if isinstance(title, str) and isinstance(body_markdown, str):
-                        final_pr_message = {"title": title, "body_markdown": body_markdown}
-
-                    pr_results.append(
-                        {
-                            "index": index,
-                            "id": normalized_pr_spec.get("id", f"prspec-{index}"),
-                            "status": pr_status,
-                            "stage_summary": pr_stage_summaries,
-                            "errors": [e.as_text() for e in pr_errors],
-                            "warnings": pr_warnings,
-                            "retry_trace": pr_retry_trace,
-                            "pr_spec": normalized_pr_spec,
-                            "final_pr_message": final_pr_message,
-                            "publish": {
-                                "requested": bool(args.publish),
-                                "url": pr_url,
-                            },
-                            "lineage": {
-                                "prspec_path": str(prspec_path),
-                                "stage_payloads": [item for item in pr_stage_lineage if item.get("index") == index],
-                            },
-                            "base_sha_at_start": preflight.base_sha_at_start,
-                            "base_sha_at_publish": base_sha_at_publish,
-                        }
-                    )
-
-                    error_blocks.extend(pr_errors)
-                    errors.extend(e.as_text() for e in pr_errors)
-                    warnings.extend(pr_warnings)
+                        error_blocks.extend(pr_errors)
+                        errors.extend(e.as_text() for e in pr_errors)
+                        warnings.extend(pr_warnings)
 
         successful_prs = [item for item in pr_results if item.get("status") == "success"]
         first_pr = successful_prs[0] if successful_prs else (pr_results[0] if pr_results else {})
         final_pr_spec = first_pr.get("pr_spec", {}) if isinstance(first_pr, dict) else {}
+        if not final_pr_spec and selected_pr_specs:
+            final_pr_spec = selected_pr_specs[0]
 
         status = "success" if not errors else "needs_human"
         summary = "Completed deterministic pipeline run."
         if errors:
             summary = "Stopped pipeline with one or more recoverable failures."
+        elif stop_after_stage:
+            summary = f"Completed deterministic pipeline run and stopped after {stop_after_stage}."
 
         pipeline_id = pipeline_id_for_run(run_id)
         if args.summary_output:
@@ -1549,6 +1684,7 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
         lineage = {
             "artifact_root": str(artifact_root),
             "summary_path": str(summary_path),
+            "report_path": str(report_path),
             "analysis_stage_payloads": analysis_stage_lineage,
             "pr_specs": pr_spec_lineage,
             "pr_stage_payloads": pr_stage_lineage,
@@ -1624,6 +1760,8 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
                 summary_path=str(summary_path),
                 lineage=lineage,
                 final_pr_spec=final_pr_spec if isinstance(final_pr_spec, dict) else None,
+                selected_pr_specs=selected_pr_specs,
+                report_path=str(report_path),
             )
             return 1, result
         try:
@@ -1651,7 +1789,7 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
             "exit_code": 0 if status == "success" else 1,
             "stdout": "",
             "stderr": "\n".join(errors),
-            "artifacts": [{"kind": "pipeline_summary", "path": summary_path_str}] if summary_path_str else [],
+            "artifacts": _build_pipeline_artifacts(summary_path=summary_path_str, report_path=str(report_path)),
             "metrics": {
                 "duration_ms": total_elapsed_ms,
                 "cost_usd": 0.0,
@@ -1665,12 +1803,21 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
                 "pipeline_mode": args.mode,
                 "run_id": run_id,
                 "runner_selected": runner_adapter.name,
+                "stop_after_stage": stop_after_stage,
                 "stage_summary": stage_summaries,
                 "top_improvements": top_improvements,
                 "selected_prspec": final_pr_spec if isinstance(final_pr_spec, dict) else {},
-                "selected_prspecs": [item.get("pr_spec", {}) for item in pr_results if isinstance(item, dict)],
+                "selected_prspecs": [
+                    item
+                    for item in (
+                        [item.get("pr_spec", {}) for item in pr_results if isinstance(item, dict)]
+                        or selected_pr_specs
+                    )
+                    if isinstance(item, dict)
+                ],
                 "final_pr_message": final_pr_message,
                 "pr_results": pr_results,
+                "report_path": str(report_path),
                 "preflight": {
                     "checks": [
                         {

@@ -392,18 +392,20 @@ class RunPipelineTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertEqual(payload["data"]["top_improvements"], [{"id": "cand-analyst", "source_stage": "scout"}])
 
-    def run_alias_pipeline_with_repo(self, mode):
+    def run_alias_pipeline_with_repo(self, mode, *, extra_args=None, include_implementation_stages=True):
         repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)
         stage_stub = self.write_alias_stage_stub()
         py = shlex.quote(str(stage_stub))
-        stage_commands = [
-            "--stage-command",
-            f"implement=python3 {py} implement {{{{PRSPEC_JSON}}}}",
-            "--stage-command",
-            f"reviewer=python3 {py} reviewer {{{{IMPLEMENT_RESULT_JSON}}}}",
-            "--stage-command",
-            f"pr_writer=python3 {py} pr_writer {{{{PRSPEC_JSON}}}}",
-        ]
+        stage_commands = []
+        if include_implementation_stages:
+            stage_commands = [
+                "--stage-command",
+                f"implement=python3 {py} implement {{{{PRSPEC_JSON}}}}",
+                "--stage-command",
+                f"reviewer=python3 {py} reviewer {{{{IMPLEMENT_RESULT_JSON}}}}",
+                "--stage-command",
+                f"pr_writer=python3 {py} pr_writer {{{{PRSPEC_JSON}}}}",
+            ]
 
         if mode == "quick-win":
             stage_commands = [
@@ -446,6 +448,7 @@ class RunPipelineTests(unittest.TestCase):
                 mode,
                 "--runner",
                 "cli",
+                *(extra_args or []),
                 *stage_commands,
             ]
         )
@@ -879,6 +882,249 @@ class RunPipelineTests(unittest.TestCase):
         self.assertEqual(scout_payload["data"]["runner_arg"], "cli")
         self.assertEqual(Path(scout_payload["data"]["report_path"]).resolve(), expected_report_path)
         self.assertEqual(scout_payload["data"]["report_parent_name"], payload["data"]["run_id"])
+
+    def test_analysis_stage_artifact_dir_is_run_scoped(self):
+        repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)
+        stage_stub = self.write_stage_stub(
+            "analysis_artifact_dir_stub.py",
+            """
+            import json
+            import sys
+            from pathlib import Path
+
+            TS = "2026-01-01T00:00:00Z"
+
+            def emit(stage, data=None, pr_spec=None):
+                payload = {
+                    "schema_version": "1.0",
+                    "id": f"{stage}-id",
+                    "stage": stage,
+                    "status": "success",
+                    "summary": "ok",
+                    "started_at": TS,
+                    "finished_at": TS,
+                    "exit_code": 0,
+                    "stdout": "",
+                    "stderr": "",
+                    "artifacts": [],
+                    "metrics": {
+                        "duration_ms": 1,
+                        "cost_usd": 0.0,
+                        "tokens_in": 0,
+                        "tokens_out": 0,
+                    },
+                    "errors": [],
+                    "warnings": [],
+                    "data": data or {},
+                }
+                if pr_spec is not None:
+                    payload["pr_spec"] = pr_spec
+                print(json.dumps(payload))
+
+            def make_pr_spec():
+                return {
+                    "schema_version": "1.0",
+                    "id": "prspec-artifact-dir",
+                    "repo": {"url": "https://example.com/repo", "owner": "o", "name": "n", "default_branch": "main"},
+                    "base": {"branch": "main"},
+                    "head": {"branch": "feature/artifact-dir"},
+                    "title": "Artifact dir regression",
+                    "body_markdown": "## What\\nArtifact dir\\n\\n## Why\\nCoverage\\n\\n## How to verify\\n```bash\\npython3 -m unittest tools.tests.test_run_pipeline.RunPipelineTests.test_analysis_stage_artifact_dir_is_run_scoped\\n```",
+                    "change_type": "test",
+                    "risk": "low",
+                    "files_touched": ["README.md"],
+                    "test_plan": ["python3 -m unittest tools.tests.test_run_pipeline.RunPipelineTests.test_analysis_stage_artifact_dir_is_run_scoped"],
+                    "ai_assistance": {"used": True, "tools": [{"name": "codex", "role": "test"}], "disclosure_line": "AI assisted"},
+                }
+
+            stage = sys.argv[1]
+            artifact_dir = Path(sys.argv[2]).resolve()
+            artifact_dir.mkdir(parents=True, exist_ok=True)
+            marker_path = artifact_dir / f"{stage}.marker"
+            marker_path.write_text(stage, encoding="utf-8")
+
+            if stage == "scout":
+                emit(
+                    "scout",
+                    data={
+                        "artifact_dir": str(artifact_dir),
+                        "marker_path": str(marker_path),
+                        "candidates": [{"id": "cand-artifact-dir"}],
+                    },
+                )
+            elif stage == "gatekeeper":
+                emit(
+                    "gatekeeper",
+                    data={
+                        "artifact_dir": str(artifact_dir),
+                        "marker_path": str(marker_path),
+                        "selected": [{"candidate_id": "cand-artifact-dir", "decision": "pr"}],
+                        "pr_specs": [make_pr_spec()],
+                    },
+                    pr_spec=make_pr_spec(),
+                )
+            else:
+                raise SystemExit(f"unknown stage: {stage}")
+            """,
+        )
+
+        py = shlex.quote(str(stage_stub))
+        args = [
+            "--repo-root",
+            str(repo),
+            "--mode",
+            "quick-win",
+            "--runner",
+            "cli",
+            "--allow-dirty",
+            "--stop-after",
+            "gatekeeper",
+            "--stage-command",
+            f"scout=python3 {py} scout {{{{ARTIFACT_DIR}}}}",
+            "--stage-command",
+            f"gatekeeper=python3 {py} gatekeeper {{{{ARTIFACT_DIR}}}}",
+        ]
+
+        exit_code_1, payload_1 = run_pipeline.run_pipeline(run_pipeline.parse_args(args))
+        exit_code_2, payload_2 = run_pipeline.run_pipeline(run_pipeline.parse_args(args))
+
+        self.assertEqual(exit_code_1, 0)
+        self.assertEqual(exit_code_2, 0)
+
+        run_1_dir = run_pipeline.default_analysis_artifact_dir(repo, payload_1["data"]["run_id"]).resolve()
+        run_2_dir = run_pipeline.default_analysis_artifact_dir(repo, payload_2["data"]["run_id"]).resolve()
+        self.assertNotEqual(run_1_dir, run_2_dir)
+
+        scout_payload_1 = json.loads(
+            Path(payload_1["data"]["lineage"]["analysis_stage_payloads"][0]["path"]).read_text(encoding="utf-8")
+        )
+        scout_payload_2 = json.loads(
+            Path(payload_2["data"]["lineage"]["analysis_stage_payloads"][0]["path"]).read_text(encoding="utf-8")
+        )
+
+        self.assertEqual(Path(scout_payload_1["data"]["artifact_dir"]).resolve(), run_1_dir)
+        self.assertEqual(Path(scout_payload_2["data"]["artifact_dir"]).resolve(), run_2_dir)
+        self.assertTrue((run_1_dir / "scout.marker").exists())
+        self.assertTrue((run_1_dir / "gatekeeper.marker").exists())
+        self.assertTrue((run_2_dir / "scout.marker").exists())
+        self.assertTrue((run_2_dir / "gatekeeper.marker").exists())
+
+    def test_analysis_only_stops_after_gatekeeper_and_emits_report(self):
+        repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)
+        stage_stub = self.write_stage_stub(
+            "analysis_only_stub.py",
+            """
+            import json
+            import sys
+            from pathlib import Path
+
+            TS = "2026-01-01T00:00:00Z"
+
+            def emit(stage, data=None, pr_spec=None):
+                payload = {
+                    "schema_version": "1.0",
+                    "id": f"{stage}-id",
+                    "stage": stage,
+                    "status": "success",
+                    "summary": "ok",
+                    "started_at": TS,
+                    "finished_at": TS,
+                    "exit_code": 0,
+                    "stdout": "",
+                    "stderr": "",
+                    "artifacts": [],
+                    "metrics": {
+                        "duration_ms": 1,
+                        "cost_usd": 0.0,
+                        "tokens_in": 0,
+                        "tokens_out": 0,
+                    },
+                    "errors": [],
+                    "warnings": [],
+                    "data": data or {},
+                }
+                if pr_spec is not None:
+                    payload["pr_spec"] = pr_spec
+                print(json.dumps(payload))
+
+            def make_pr_spec():
+                return {
+                    "schema_version": "1.0",
+                    "id": "prspec-analysis-only",
+                    "repo": {"url": "https://example.com/repo", "owner": "o", "name": "n", "default_branch": "main"},
+                    "base": {"branch": "main"},
+                    "head": {"branch": "feature/analysis-only"},
+                    "title": "Analysis only regression",
+                    "body_markdown": "## What\\nAnalysis only\\n\\n## Why\\nCoverage\\n\\n## How to verify\\n```bash\\npython3 -m unittest tools.tests.test_run_pipeline.RunPipelineTests.test_analysis_only_stops_after_gatekeeper_and_emits_report\\n```",
+                    "change_type": "test",
+                    "risk": "low",
+                    "files_touched": ["README.md"],
+                    "test_plan": ["python3 -m unittest tools.tests.test_run_pipeline.RunPipelineTests.test_analysis_only_stops_after_gatekeeper_and_emits_report"],
+                    "ai_assistance": {"used": True, "tools": [{"name": "codex", "role": "test"}], "disclosure_line": "AI assisted"},
+                }
+
+            stage = sys.argv[1]
+            if stage == "scout":
+                report_path = Path(sys.argv[2]).resolve()
+                report_path.parent.mkdir(parents=True, exist_ok=True)
+                report_path.write_text("# Analysis-only report\\n", encoding="utf-8")
+                emit(
+                    "scout",
+                    data={
+                        "report_path": str(report_path),
+                        "candidates": [{"id": "cand-analysis-only"}],
+                    },
+                )
+            elif stage == "gatekeeper":
+                pr_spec = make_pr_spec()
+                emit(
+                    "gatekeeper",
+                    data={
+                        "selected": [{"candidate_id": "cand-analysis-only", "decision": "pr"}],
+                        "pr_specs": [pr_spec],
+                    },
+                    pr_spec=pr_spec,
+                )
+            else:
+                raise SystemExit(f"unknown stage: {stage}")
+            """,
+        )
+
+        py = shlex.quote(str(stage_stub))
+        args = run_pipeline.parse_args(
+            [
+                "--repo-root",
+                str(repo),
+                "--mode",
+                "quick-win",
+                "--runner",
+                "cli",
+                "--analysis-only",
+                "--stage-command",
+                f"scout=python3 {py} scout {{{{REPORT_PATH}}}}",
+                "--stage-command",
+                f"gatekeeper=python3 {py} gatekeeper",
+            ]
+        )
+
+        exit_code, payload = run_pipeline.run_pipeline(args)
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(payload["status"], "success")
+        self.assertEqual(payload["data"]["stop_after_stage"], "gatekeeper")
+        self.assertEqual(payload["data"]["pr_results"], [])
+        self.assertEqual(payload["data"]["selected_prspec"]["id"], "prspec-analysis-only")
+        self.assertEqual(payload["data"]["selected_prspecs"][0]["id"], "prspec-analysis-only")
+        self.assertIn("stopped after gatekeeper", payload["summary"])
+
+        expected_report_path = run_pipeline.default_report_path(repo, payload["data"]["run_id"]).resolve()
+        self.assertEqual(Path(payload["data"]["report_path"]).resolve(), expected_report_path)
+        self.assertTrue(expected_report_path.exists())
+        self.assertIn(
+            {"kind": "report", "path": str(expected_report_path)},
+            payload["artifacts"],
+        )
+        self.assertTrue(Path(payload["data"]["pipeline_summary_path"]).exists())
 
     def test_unknown_placeholder_fails_before_stage_execution(self):
         marker = self.factory.root / "unknown-placeholder-ran.txt"
