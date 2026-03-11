@@ -13,6 +13,7 @@ CANONICAL_PLACEHOLDERS: dict[str, str] = {
     "ALLOWED_COMMANDS": "Optional allowlist of commands for implementation/verification.",
     "ALLOWED_FILES_HINT": "Optional file-scope hint for critic evaluation.",
     "ANALYST_JSON": "Path to Analyst ExecutionResult JSON saved by runtime.",
+    "ARTIFACT_DIR": "Directory where analysis-stage JSON artifacts should be written.",
     "ARCHITECT_JSON": "Path to Architect ExecutionResult JSON saved by runtime.",
     "BASE_BRANCH": "Base branch name.",
     "CHANGE_REQUEST": "Direct change request for targeted code edits.",
@@ -52,6 +53,8 @@ PLACEHOLDER_ALIASES: dict[str, tuple[str, ...]] = {
 }
 
 DOC_FILES = (
+    "README.md",
+    "AGENTS.md",
     "skills/README.md",
     "tools/README.md",
 )

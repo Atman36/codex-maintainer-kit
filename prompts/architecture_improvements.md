@@ -22,7 +22,7 @@ Find **one** architectural improvement that:
 - Build schema-valid `ExecutionResult` JSON payload with either:
   - data.candidate (a single candidate PR) or
   - status = needs_human with an Issue proposal if risky.
-- Save payload to `/Users/Apple/Developer/pr-factory-kit/analysis_report/architect-<timestamp>.json`.
+- Save payload to `{{ARTIFACT_DIR}}/architect-<timestamp>.json`.
 - In chat output only: `SAVED_JSON_PATH=<absolute_path_to_json>`.
 
 ## Output (JSON payload to save in file)

@@ -33,11 +33,11 @@ Fail fast with:
 
 1. `pr-factory-scout`
 - Input: `REPO_ROOT`, `REPO_URL`, `BASE_BRANCH`
-- Output: candidates JSON (`ExecutionResult`) persisted to `analysis_report` with `SAVED_JSON_PATH`
+- Output: candidates JSON (`ExecutionResult`) persisted under `ARTIFACT_DIR` with `SAVED_JSON_PATH`
 
 2. `pr-factory-analyst`
 - Input: `REPO_ROOT`, optional `FOCUS`
-- Output: refined candidates JSON + `related_files` hints for Implementer context scope (persisted to `analysis_report`)
+- Output: refined candidates JSON + `related_files` hints for Implementer context scope (persisted under `ARTIFACT_DIR`)
 
 3. `pr-factory-critic`
 - Input: proposed changes/candidates + optional policy constraints

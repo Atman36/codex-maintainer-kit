@@ -20,7 +20,8 @@ Prompts use placeholders like:
 - `{{REPO_ROOT}}`, `{{REPO_URL}}`, `{{BASE_BRANCH}}`, `{{HEAD_BRANCH}}`
 - `{{CONSTRAINTS}}` (plain bullet list)
 - `{{ALLOWED_COMMANDS}}` (plain bullet list)
-- `{{CONTEXT}}` (optional short notes)
+- `{{CONTEXT_PATH}}` (optional external context path)
+- `{{ARTIFACT_DIR}}` / `{{REPORT_PATH}}` (portable artifact locations injected by the orchestrator)
 
 ## Output rule (important)
 

@@ -14,13 +14,22 @@ Select up to `{{MAX_PRS}}` candidates and turn each into a **PRSpec** that is:
 
 ## Rules
 - Do NOT invent project requirements; use what repo already has.
-- Gatekeeper is primarily technical shaping: if critic already approved, avoid re-doing strategic debate and focus on minimal executable PRSpec.
+- If Critic already approved the work, treat that as the strategic decision. Focus on minimal executable PRSpec and scope minimization, not a second strategic review.
 - Reject anything that smells like: “refactor for aesthetics”, mass formatting, new deps, API break.
 - If uncertain, recommend **Issue first** (status needs_human) instead of PR.
 - Build schema-valid `ExecutionResult` JSON payload and include `pr_spec` for the top pick.
   - For multiple PRs, put additional PRSpecs under `data.pr_specs[]`.
-- Save payload to `/Users/Apple/Developer/pr-factory-kit/analysis_report/gatekeeper-<timestamp>.json`.
+- Save payload to `{{ARTIFACT_DIR}}/gatekeeper-<timestamp>.json`.
 - In chat output only: `SAVED_JSON_PATH=<absolute_path_to_json>`.
+
+## After Critic Approves
+- Do scope shaping first: narrow files, remove extras, tighten verification, keep one clear PR value.
+- Do not reopen broad product strategy unless the Critic-approved plan still implies API breakage, new deps, or unclear verification.
+- Prefer "drop/split" over "debate again".
+
+## Examples
+- Good Gatekeeper action: turn an approved docs+tests idea into a test-only PRSpec, or cut a mixed bugfix+cleanup plan down to the bugfix.
+- Bad Gatekeeper action: re-argue whether a typo fix matters after Critic already approved it.
 
 ## Output (JSON payload to save in file)
 Build `ExecutionResult` with stage=`gatekeeper` and:

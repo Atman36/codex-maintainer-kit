@@ -12,7 +12,7 @@ Quickly decide whether this repo is a good target *right now*, and list 3–7 **
 - Prefer small, low-risk PRs: docs/tests/bugfix/CI/DX. Avoid “refactor everything”.
 - Respect CONTRIBUTING.md and existing tooling. Don’t suggest adding new deps unless unavoidable.
 - Build schema-valid `ExecutionResult` JSON payload.
-- Save payload to `/Users/Apple/Developer/pr-factory-kit/analysis_report/scout-<timestamp>.json`.
+- Save payload to `{{ARTIFACT_DIR}}/scout-<timestamp>.json`.
 - In chat output only: `SAVED_JSON_PATH=<absolute_path_to_json>`.
 - Put all findings under `data`.
 

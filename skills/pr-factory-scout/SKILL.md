@@ -10,7 +10,7 @@ description: |
   - Evaluating if a repository is a good target for automated PRs
 
   Builds structured JSON (ExecutionResult) with repo profile and candidates.
-  Saves it to `/Users/Apple/Developer/pr-factory-kit/analysis_report/` and returns only the saved path in chat.
+  Saves it under `{{ARTIFACT_DIR}}/` and returns only the saved path in chat.
 license: MIT
 ---
 
@@ -44,7 +44,7 @@ For detailed guidance on repo signals and scoring heuristics, see [references/re
 - **Prefer small, low-risk PRs**: docs/tests/bugfix/CI/DX. Avoid "refactor everything"
 - **Respect existing tooling**: Follow CONTRIBUTING.md and existing tools. Don't suggest adding new deps unless unavoidable
 - **Schema-valid JSON payload**: Build payload conforming to `ExecutionResult`
-- **Persist analysis JSON**: Write payload to `/Users/Apple/Developer/pr-factory-kit/analysis_report/scout-<timestamp>.json`
+- **Persist analysis JSON**: Write payload to `{{ARTIFACT_DIR}}/scout-<timestamp>.json`
 - **Chat output format**: Return only `SAVED_JSON_PATH=<absolute_path_to_json>`
 - **Put all findings under `data`**: Keep structured results in the data field
 
@@ -119,12 +119,12 @@ For detailed guidance on repo signals and scoring heuristics, see [references/re
 
 2. Save the JSON file to:
 
-`/Users/Apple/Developer/pr-factory-kit/analysis_report/scout-<timestamp>.json`
+`{{ARTIFACT_DIR}}/scout-<timestamp>.json`
 
 3. Return to chat only:
 
 ```text
-SAVED_JSON_PATH=/Users/Apple/Developer/pr-factory-kit/analysis_report/scout-<timestamp>.json
+SAVED_JSON_PATH=<absolute_path_to_{{ARTIFACT_DIR}}/scout-<timestamp>.json>
 ```
 
 ## Quality Standards

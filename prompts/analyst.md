@@ -14,7 +14,7 @@ Produce up to **5** concrete PR candidates that are likely to be accepted.
 - Prefer: doc fixes, examples, tests, small bugfixes, clearer errors, minor perf with proof.
 - Avoid: mass formatting, big refactors, dependency changes, API breaks.
 - Build schema-valid `ExecutionResult` JSON payload. Put candidates under `data.candidates`.
-- Save payload to `/Users/Apple/Developer/pr-factory-kit/analysis_report/analyst-<timestamp>.json`.
+- Save payload to `{{ARTIFACT_DIR}}/analyst-<timestamp>.json`.
 - In chat output only: `SAVED_JSON_PATH=<absolute_path_to_json>`.
 
 ## Candidate quality bar

@@ -10,7 +10,7 @@ description: |
   - Seeking to clarify boundaries or isolate side-effects
 
   Builds structured JSON (ExecutionResult) with one architectural improvement candidate.
-  Saves it to `/Users/Apple/Developer/pr-factory-kit/analysis_report/` and returns only the saved path in chat.
+  Saves it under `{{ARTIFACT_DIR}}/` and returns only the saved path in chat.
 license: MIT
 ---
 
@@ -91,7 +91,7 @@ For detailed patterns and examples, see [references/refactoring-patterns.md](ref
 - **Don't add dependencies** unless truly necessary
 - **Don't change public API** unless internal/unstable
 - **Schema-valid JSON payload**: Build payload conforming to `ExecutionResult`
-- **Persist analysis JSON**: Write payload to `/Users/Apple/Developer/pr-factory-kit/analysis_report/architect-<timestamp>.json`
+- **Persist analysis JSON**: Write payload to `{{ARTIFACT_DIR}}/architect-<timestamp>.json`
 - **Chat output format**: Return only `SAVED_JSON_PATH=<absolute_path_to_json>`
 
 ## Process
@@ -177,12 +177,12 @@ If improvement is **risky** or requires **discussion**, return `status: needs_hu
 
 2. Save the JSON file to:
 
-`/Users/Apple/Developer/pr-factory-kit/analysis_report/architect-<timestamp>.json`
+`{{ARTIFACT_DIR}}/architect-<timestamp>.json`
 
 3. Return to chat only:
 
 ```text
-SAVED_JSON_PATH=/Users/Apple/Developer/pr-factory-kit/analysis_report/architect-<timestamp>.json
+SAVED_JSON_PATH=<absolute_path_to_{{ARTIFACT_DIR}}/architect-<timestamp>.json>
 ```
 
 ## Quality Standards

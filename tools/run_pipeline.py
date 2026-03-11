@@ -357,6 +357,10 @@ def slugify(value: str) -> str:
     return slug
 
 
+def default_artifact_dir(repo_root: Path) -> Path:
+    return repo_root / "analysis_report"
+
+
 def normalize_head_branch(pr_spec: Dict[str, Any], index: int) -> str:
     title = str(pr_spec.get("title") or "").strip()
     source_branch = ""
@@ -1010,6 +1014,7 @@ def run_pipeline(args: argparse.Namespace) -> Tuple[int, Dict[str, Any]]:
             "MODE": args.mode,
             "MAX_PRS": str(args.max_prs),
             "TEMP_DIR": str(tmp),
+            "ARTIFACT_DIR": str(default_artifact_dir(repo_root)),
         }
 
         # Analysis path executes once.

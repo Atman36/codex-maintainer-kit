@@ -10,7 +10,7 @@ description: |
   - Ensuring PR scope is minimal and easy to review
 
   Builds structured JSON (ExecutionResult) with decisions and PRSpec for top candidate.
-  Saves it to `/Users/Apple/Developer/pr-factory-kit/analysis_report/` and returns only the saved path in chat.
+  Saves it under `{{ARTIFACT_DIR}}/` and returns only the saved path in chat.
 license: MIT
 ---
 
@@ -76,8 +76,15 @@ For detailed PRSpec structure and minimal scope guidelines, see [references/prsp
 - **No new deps**: Unless candidate explicitly justifies it
 - **No API breaks**: Unless repo version is 0.x and breaking changes are normal
 - **Schema-valid JSON payload**: Build payload conforming to `ExecutionResult`
-- **Persist analysis JSON**: Write payload to `/Users/Apple/Developer/pr-factory-kit/analysis_report/gatekeeper-<timestamp>.json`
+- **Persist analysis JSON**: Write payload to `{{ARTIFACT_DIR}}/gatekeeper-<timestamp>.json`
 - **Chat output format**: Return only `SAVED_JSON_PATH=<absolute_path_to_json>`
+
+## After Critic Approval
+
+- Treat Critic approval as the default strategic decision.
+- Focus on scope minimization: drop extras, split mixed ideas, tighten files and verification.
+- Re-open strategy only if the allegedly approved slice still implies API breaks, new deps, or unclear verification.
+- Prefer "issue" only when discussion is genuinely still needed.
 
 ## Output Format
 
@@ -175,12 +182,12 @@ For detailed PRSpec structure and minimal scope guidelines, see [references/prsp
 
 2. Save the JSON file to:
 
-`/Users/Apple/Developer/pr-factory-kit/analysis_report/gatekeeper-<timestamp>.json`
+`{{ARTIFACT_DIR}}/gatekeeper-<timestamp>.json`
 
 3. Return to chat only:
 
 ```text
-SAVED_JSON_PATH=/Users/Apple/Developer/pr-factory-kit/analysis_report/gatekeeper-<timestamp>.json
+SAVED_JSON_PATH=<absolute_path_to_{{ARTIFACT_DIR}}/gatekeeper-<timestamp>.json>
 ```
 
 ## Quality Standards
@@ -190,3 +197,8 @@ SAVED_JSON_PATH=/Users/Apple/Developer/pr-factory-kit/analysis_report/gatekeeper
 - **PRSpec body**: What/Why/How tested, no marketing fluff
 - **Minimal scope**: If you can cut it in half, do it
 - **Clear test plan**: Exact commands, not "run tests"
+
+## Quick Examples
+
+- Good Gatekeeper action: cut an approved docs+tests bundle down to the test-only slice, or remove opportunistic cleanup from a tiny bugfix.
+- Bad Gatekeeper action: re-argue whether a Critic-approved typo fix or regression test is strategically worthwhile.

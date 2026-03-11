@@ -196,6 +196,24 @@ class RunPipelineTests(unittest.TestCase):
             },
         }
 
+    def test_default_artifact_dir_is_repo_relative(self):
+        repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)
+
+        artifact_dir = run_pipeline.default_artifact_dir(repo)
+
+        self.assertEqual(artifact_dir, repo / "analysis_report")
+
+    def test_expand_template_accepts_artifact_dir_placeholder(self):
+        expanded = run_pipeline.expand_template(
+            "save {{ARTIFACT_DIR}}/{{STAGE}}.json",
+            {
+                "ARTIFACT_DIR": "/tmp/example/analysis_report",
+                "STAGE": "critic",
+            },
+        )
+
+        self.assertEqual(expanded, "save /tmp/example/analysis_report/critic.json")
+
     def run_alias_pipeline(self, mode):
         repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)
         stage_stub = self.write_alias_stage_stub()

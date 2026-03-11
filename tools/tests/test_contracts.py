@@ -55,6 +55,19 @@ class ContractRegistryTests(unittest.TestCase):
         self.assertEqual(issues[0].severity, "error")
         self.assertIn("Unknown placeholder 'MISSING_PLACEHOLDER'", issues[0].message)
 
+    def test_root_docs_are_scanned_for_unknown_placeholders(self):
+        (self.root / "README.md").write_text(
+            "Bad root placeholder: {{MISSING_ROOT_PLACEHOLDER}}\n",
+            encoding="utf-8",
+        )
+
+        issues = contract_registry.collect_contract_issues(self.root)
+
+        self.assertEqual(len(issues), 1)
+        self.assertEqual(issues[0].severity, "error")
+        self.assertEqual(issues[0].path, self.root / "README.md")
+        self.assertIn("Unknown placeholder 'MISSING_ROOT_PLACEHOLDER'", issues[0].message)
+
     def test_implement_result_json_alias_reports_warning(self):
         prompts_dir = self.root / "prompts"
         prompts_dir.mkdir(parents=True, exist_ok=True)

@@ -120,7 +120,7 @@ Skills reference shared resources in the repository root:
 - **execution_result.schema.json** - Standard output format for all agents
 - **prspec.schema.json** - PR specification format
 
-Execution payloads are JSON-based. Analysis skills (`scout`, `analyst`, `architect`, `critic`, `gatekeeper`) persist JSON files to `/Users/Apple/Developer/pr-factory-kit/analysis_report/` and return `SAVED_JSON_PATH=...` in chat.
+Execution payloads are JSON-based. Analysis skills (`scout`, `analyst`, `architect`, `critic`, `gatekeeper`) persist JSON files under `{{ARTIFACT_DIR}}` and return `SAVED_JSON_PATH=...` in chat. The default runner artifact directory is repo-relative `analysis_report/`.
 
 ### Tools (../../tools/)
 
@@ -147,6 +147,7 @@ Skills use placeholders that must be filled by orchestrator:
 | `{{RELATED_FILES}}` | High-signal files for scoped implementation | (Analyst/Scout output) |
 | `{{FOCUS}}` | Analysis focus | `docs`, `tests`, `bugfix` |
 | `{{MAX_PRS}}` | Maximum PRs to select | `1`, `3` |
+| `{{ARTIFACT_DIR}}` | Directory for analysis-stage JSON artifacts | `<repo>/analysis_report` |
 | `{{CONSTRAINTS}}` | Additional constraints | (Custom) |
 | `{{ALLOWED_COMMANDS}}` | Allowed verification commands | (Custom) |
 
@@ -305,7 +306,7 @@ For Critic:
 ### Output Not Valid JSON
 
 1. Validate JSON payload against schema: `../../schemas/execution_result.schema.json`
-2. For analysis stages, inspect file from `SAVED_JSON_PATH` in `/Users/Apple/Developer/pr-factory-kit/analysis_report/`
+2. For analysis stages, inspect the file from `SAVED_JSON_PATH` under the configured `{{ARTIFACT_DIR}}` (default: repo-relative `analysis_report/`)
 3. Validate with: `python3 -m jsonschema schemas/execution_result.schema.json < output.json`
 
 ### Placeholders Not Filled

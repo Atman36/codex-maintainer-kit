@@ -10,7 +10,7 @@ description: |
   - Require pre-implementation quality gate
 
   Builds structured JSON with decision (approve/revise/reject) and detailed evaluation.
-  Saves it to `/Users/Apple/Developer/pr-factory-kit/analysis_report/` and returns only the saved path in chat.
+  Saves it under `{{ARTIFACT_DIR}}/` and returns only the saved path in chat.
 license: MIT
 ---
 
@@ -94,6 +94,17 @@ Detailed criteria and examples in [references/evaluation-criteria.md](references
 - Diff will be noisy (mass-format, rename-storm) without functional benefit
 - Security/crypto/auth is involved — but there is no domain confidence/proof
 
+## Fast Approve Path
+
+Lean `approve` when the proposed work is already narrow, reviewer-friendly, and easy to verify:
+
+- Tiny docs fixes with clear correctness or portability value
+- Test-only additions that cover a real missing case
+- Narrow DX/CI fixes with explicit verification
+- Small bugfixes with a clear cause and bounded blast radius
+
+Keep `revise/reject` for broad refactors, migrations, new dependencies, API breaks, auth/security work without evidence, and noisy diffs.
+
 ## Output Format
 
 1. Build JSON payload conforming to `../../schemas/execution_result.schema.json`.
@@ -169,12 +180,12 @@ Detailed criteria and examples in [references/evaluation-criteria.md](references
 
 2. Save the JSON file to:
 
-`/Users/Apple/Developer/pr-factory-kit/analysis_report/critic-<timestamp>.json`
+`{{ARTIFACT_DIR}}/critic-<timestamp>.json`
 
 3. Return to chat only:
 
 ```text
-SAVED_JSON_PATH=/Users/Apple/Developer/pr-factory-kit/analysis_report/critic-<timestamp>.json
+SAVED_JSON_PATH=<absolute_path_to_{{ARTIFACT_DIR}}/critic-<timestamp>.json>
 ```
 
 ## Decision Types
@@ -194,12 +205,17 @@ Changes are unnecessary/too risky/not a fit for the project.
 
 ## Important Style
 
-- **Be tough and pragmatic**: Better to "reject/revise" than a questionable PR
+- **Be tough and pragmatic**: reject weak or risky work, but do not over-penalize obvious low-risk/high-signal fixes
 - **Prefer a minimal PR**: One that is easy to accept
 - **Suggest a split plan**: If the scope can be divided
 - **Check assumptions**: What are you assuming? Does it need to be verified?
 - **Think like a maintainer**: Would I accept this in my project?
 - If `decision=revise`, always fill `must_fix_before_implement` (minimum 1 item)
+
+## Quick Examples
+
+- `approve`: typo or contract fix in docs, missing regression test, tiny null-check bugfix, small CI guardrail
+- `revise/reject`: convenience dependency, multi-module refactor, API rename, auth flow rewrite, noisy cleanup mixed with a bugfix
 
 ## Output Examples
 

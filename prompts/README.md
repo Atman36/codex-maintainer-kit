@@ -10,7 +10,7 @@ These prompts are designed to be *short* and stack-agnostic.
 
 ## Output
 Execution payloads are JSON-based and conform to `schemas/execution_result.schema.json`.
-Analysis prompts (`scout`, `analyst`, `architecture_improvements`, `gatekeeper`, `agent-critic`) now save JSON to `/Users/Apple/Developer/pr-factory-kit/analysis_report/` and return `SAVED_JSON_PATH=...` in chat.
+Analysis prompts (`scout`, `analyst`, `architecture_improvements`, `gatekeeper`, `agent-critic`) save JSON under `{{ARTIFACT_DIR}}` and return `SAVED_JSON_PATH=...` in chat. The default runner artifact directory is repo-relative `analysis_report/`.
 Role-specific payload goes into `ExecutionResult.data`.
 
 ## Recommended entrypoint
