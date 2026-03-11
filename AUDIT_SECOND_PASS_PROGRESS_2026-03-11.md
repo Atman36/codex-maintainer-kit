@@ -14,12 +14,17 @@ Commands run from repo root on 2026-03-11:
 - `. .venv/bin/activate && python -m unittest discover -s tools/tests -p 'test_*.py'`
 - `python3 -m unittest tools.tests.test_run_pipeline`
 - `python3 -m unittest discover -s tools/tests -p 'test_*.py'`
+- `python3 -m pip install -e .`
+- `. .tmp-editable-verify/bin/activate && python3 -m pip install -e .`
+- `. .tmp-editable-verify/bin/activate && python3 tools/validate_skills.py`
+- `. .tmp-editable-verify/bin/activate && python3 -m unittest discover -s tools/tests -p 'test_*.py'`
 - `rg -n "/Users/Apple/Developer/pr-factory-kit/analysis_report/" skills prompts README.md AGENTS.md tools specs FRAMEWORK_IMPROVEMENTS_2026-03-11.md`
 - `rg -n "low-risk|approve|scope minimization|strategic" prompts/agent-critic.md skills/pr-factory-critic/SKILL.md prompts/gatekeeper.md skills/pr-factory-gatekeeper/SKILL.md`
 - targeted source checks against `tools/run_pipeline.py`, `tools/contract_registry.py`, `README.md`
 
 Note:
-- `jsonschema` is now installed for the current system `python3`, so the exact runner verification commands pass both bare and in `.venv`.
+- Bare `python3 -m pip install -e .` is blocked here by the host's externally managed Homebrew environment (PEP 668).
+- Editable-install behavior itself was verified successfully in a clean temporary virtualenv using the same command after activation.
 
 Confirmed done:
 - Repository-level skill validation is green on the current checkout.

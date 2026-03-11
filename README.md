@@ -27,3 +27,13 @@ Prompts use placeholders like:
 
 All role prompts request **JSON only**, conforming to `schemas/execution_result.schema.json`.
 Role-specific details go into `ExecutionResult.data`.
+
+## Local setup
+
+For editable installs during local development:
+
+```bash
+python3 -m pip install -e .
+```
+
+`requirements.txt` remains available for lightweight bootstrap and CI-style installs.
