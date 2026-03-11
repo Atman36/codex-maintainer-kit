@@ -44,7 +44,6 @@ DEFAULT_EXCLUDES = (
 @dataclass(frozen=True)
 class GitBlob:
     mode: int
-    object_id: str
     path: str
 
 
@@ -87,20 +86,20 @@ def normalize_prefix(repo_root: Path, prefix_arg: str) -> str:
     return f"{repo_root.name}/"
 
 
-def git_blobs(repo_root: Path, ref: str) -> List[GitBlob]:
-    proc = run_git(["ls-tree", "-r", "-z", ref], cwd=repo_root)
+def git_blobs(repo_root: Path) -> List[GitBlob]:
+    proc = run_git(["ls-files", "-s", "-z"], cwd=repo_root)
     if proc.returncode != 0:
-        raise RuntimeError(proc.stderr.strip() or f"git ls-tree failed for ref '{ref}'")
+        raise RuntimeError(proc.stderr.strip() or "git ls-files failed")
 
     blobs: List[GitBlob] = []
     for record in proc.stdout.split("\0"):
         if not record:
             continue
         meta, path = record.split("\t", 1)
-        mode_text, object_type, object_id = meta.split(" ", 2)
-        if object_type != "blob":
+        mode_text, _object_id, stage_text = meta.split(" ", 2)
+        if stage_text != "0":
             continue
-        blobs.append(GitBlob(mode=int(mode_text, 8), object_id=object_id, path=path))
+        blobs.append(GitBlob(mode=int(mode_text, 8), path=path))
     return blobs
 
 
@@ -112,21 +111,21 @@ def should_exclude(path: str, patterns: Iterable[str]) -> bool:
     return False
 
 
-def read_blob(repo_root: Path, object_id: str) -> bytes:
+def read_blob(repo_root: Path, ref: str, path: str) -> bytes:
     proc = subprocess.run(
-        ["git", "cat-file", "-p", object_id],
+        ["git", "show", f"{ref}:{path}"],
         cwd=str(repo_root),
         capture_output=True,
         check=False,
     )
     if proc.returncode != 0:
         stderr = proc.stderr.decode("utf-8", errors="replace").strip()
-        raise RuntimeError(stderr or f"git cat-file failed for object '{object_id}'")
+        raise RuntimeError(stderr or f"git show failed for '{ref}:{path}'")
     return proc.stdout
 
 
 def create_archive(repo_root: Path, ref: str, output_path: Path, prefix: str, excludes: Iterable[str]) -> List[str]:
-    blobs = git_blobs(repo_root=repo_root, ref=ref)
+    blobs = git_blobs(repo_root=repo_root)
     included_paths: List[str] = []
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -135,7 +134,7 @@ def create_archive(repo_root: Path, ref: str, output_path: Path, prefix: str, ex
             if should_exclude(blob.path, excludes):
                 continue
 
-            data = read_blob(repo_root=repo_root, object_id=blob.object_id)
+            data = read_blob(repo_root=repo_root, ref=ref, path=blob.path)
             tar_info = tarfile.TarInfo(name=f"{prefix}{blob.path}")
             tar_info.size = len(data)
             tar_info.mode = blob.mode
