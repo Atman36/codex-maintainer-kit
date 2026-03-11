@@ -207,7 +207,7 @@
   - лучше всего `deepresearch/external-audits/<slug>.md`;
 - если это должен быть долгоживущий system-of-record, не храни его только как большой narrative:
   - разрежь на versioned implementation specs в `specs/<audit-slug>/`;
-  - добавь индекс наподобие `specs/audit-report-2026-03-11/INDEX.md`;
+  - добавь индекс вида `specs/<audit-slug>/INDEX.md`;
 - если это просто фон для одного запуска, не смешивай его с каноническими contracts, а передавай как external context.
 
 ## Ограничения
