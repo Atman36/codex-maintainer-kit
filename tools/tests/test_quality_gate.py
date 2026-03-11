@@ -115,6 +115,45 @@ class QualityGateCliTests(unittest.TestCase):
 
 
 class QualityGateMergeProbabilityTests(unittest.TestCase):
+    def test_classify_paths_only_counts_known_ci_configs(self):
+        buckets = quality_gate.classify_paths(
+            [
+                ".github/workflows/test.yml",
+                "docker-compose.yml",
+                "ops/pipeline.yaml",
+                ".gitlab-ci.yml",
+            ]
+        )
+
+        self.assertEqual(buckets["ci"], 2)
+        self.assertEqual(buckets["other"], 2)
+
+    def test_merge_probability_does_not_grant_ci_credit_for_non_ci_yaml(self):
+        signals = {"ci_detected": True, "contributing_detected": True}
+        base_prspec = {
+            "risk": "low",
+            "test_plan": ["python3 -m unittest tools/tests/test_quality_gate.py"],
+        }
+
+        non_ci = quality_gate.merge_probability(
+            base_prspec,
+            quality_gate.DiffStats(files=1, insertions=8, deletions=0, paths=["docker-compose.yml"]),
+            signals,
+            [],
+            [],
+        )
+        ci = quality_gate.merge_probability(
+            base_prspec,
+            quality_gate.DiffStats(files=1, insertions=8, deletions=0, paths=[".github/workflows/test.yml"]),
+            signals,
+            [],
+            [],
+        )
+
+        self.assertEqual(non_ci["buckets"]["ci"], 0)
+        self.assertEqual(ci["buckets"]["ci"], 1)
+        self.assertAlmostEqual(ci["probability"] - non_ci["probability"], 0.03)
+
     def test_merge_probability_body_markdown_case_insensitive_bonus(self):
         diff = quality_gate.DiffStats(files=1, insertions=4, deletions=0, paths=["tools/quality_gate.py"])
         signals = {"ci_detected": True, "contributing_detected": True}

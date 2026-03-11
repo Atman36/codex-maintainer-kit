@@ -25,7 +25,7 @@ Pre-publish safety gate for PR Factory runs.
 2. Flags forbidden tool-state paths (agent directories, local env files, etc.)
 3. Runs a conservative regex scan for secret-like tokens in changed text files
 4. Computes a local-only merge probability heuristic
-5. Optionally enforces `pr_spec.files_touched` and can auto-clean out-of-scope changes
+5. Optionally enforces the PRSpec `files_touched` list and can auto-clean out-of-scope changes
 
 ### Usage
 
@@ -88,16 +88,25 @@ With `--json` flag, outputs structured result:
 
 ```json
 {
-  "passed": true,
-  "findings": {
-    "forbidden_paths": [],
-    "secret_patterns": [],
-    "unplanned_files": []
+  "repo": "/path/to/repo",
+  "changed_paths": ["tools/quality_gate.py"],
+  "forbidden_hits": [],
+  "secret_hits": [],
+  "files_touched_check": {
+    "enabled": true,
+    "allowed_patterns": ["tools/quality_gate.py"],
+    "unplanned_paths": [],
+    "autoclean_applied": false,
+    "autoclean_errors": [],
+    "autocleaned_paths": []
   },
-  "merge_probability": {
-    "score": 0.85,
-    "factors": ["low risk", "minimal scope"]
-  }
+  "merge_assessment": {
+    "probability": 0.85,
+    "label": "high",
+    "reasons": ["Very small diff (≤80 LOC)."],
+    "blockers": []
+  },
+  "ok": true
 }
 ```
 
@@ -112,9 +121,10 @@ Validates integrity of local skill packages in `skills/`.
 1. `SKILL.md` exists for each skill
 2. `SKILL.md` includes frontmatter with required keys (`name`, `description`)
 3. `metadata.json` exists, is valid JSON, and includes `version`
-4. PR Factory prompts, skills, and docs use only placeholders from [`tools/contract_registry.py`](./contract_registry.py)
-5. Legacy placeholder aliases are reported explicitly as warnings
-6. Metadata `*_JSON` inputs are declared as `type: "string"` because runtime passes file paths, not embedded objects
+4. PR Factory prompts, root docs, workflow docs, PR Factory skill `references/`, and `examples/` use only placeholders from [`tools/contract_registry.py`](./contract_registry.py)
+5. Stale guidance patterns in docs/examples are blocked (deprecated aliases, stale test commands, stale `files_touched` references with the old `pr_spec` prefix)
+6. Legacy placeholder aliases inside prompts/metadata are reported explicitly as warnings
+7. Metadata `*_JSON` inputs are declared as `type: "string"` because runtime passes file paths, not embedded objects
 
 ### Usage
 
@@ -131,7 +141,7 @@ python3 tools/validate_skills.py --root /path/to/repo
 Validation policy:
 
 - Unknown placeholders fail validation.
-- Canonical placeholders are preferred in prompts, skills, and docs; runner aliases remain supported for backward compatibility.
+- Canonical placeholders are required in docs/examples; runner aliases remain supported internally for backward compatibility.
 - Metadata entries like `ANALYST_JSON` / `IMPLEMENT_JSON` / `PRSPEC_JSON` / `SCOUT_JSON` fail if they claim `type: "object"`.
 
 ### Exit Codes
@@ -240,13 +250,6 @@ The following placeholders are supported in stage commands:
 | `{{GATEKEEPER_JSON}}` | Gatekeeper output | Previous stage |
 | `{{IMPLEMENT_JSON}}` | Implementer output | Previous stage |
 | `{{REVIEWER_JSON}}` | Reviewer output | Previous stage |
-
-Legacy aliases kept for backward compatibility:
-
-| Alias | Resolves To |
-|-------|-------------|
-| `CANDIDATES_JSON` | First available of `ANALYST_JSON`, `ARCHITECT_JSON`, `SCOUT_JSON` |
-| `IMPLEMENT_RESULT_JSON` | `IMPLEMENT_JSON` |
 
 If a stage command still contains any unresolved `{{...}}` placeholder after expansion, the runner fails that stage before executing the shell command and surfaces a deterministic error.
 

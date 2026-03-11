@@ -29,7 +29,7 @@ Ensure the actual diff is minimal, clean, and aligned with PRSpec before creatin
 
 ## Process
 
-1. Compare changed files vs `pr_spec.files_touched`.
+1. Compare changed files vs the PRSpec `files_touched` list.
 2. Check for hygiene issues (debug prints, commented dead code, accidental artifacts).
 3. Verify tests/commands evidence from Implementer output.
 4. Return pass/fail with explicit required fixes.

@@ -55,8 +55,38 @@ PLACEHOLDER_ALIASES: dict[str, tuple[str, ...]] = {
 DOC_FILES = (
     "README.md",
     "AGENTS.md",
+    "CLAUDE.md",
     "skills/README.md",
+    "skills/WORKFLOW.md",
     "tools/README.md",
+)
+
+SKILL_TEXT_PATTERNS = (
+    "SKILL.md",
+    "README.md",
+    "AGENTS.md",
+    "WORKFLOW.md",
+    "references/**/*.md",
+    "examples/**/*.md",
+)
+
+STALE_TEXT_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (
+        re.compile(r"\bCANDIDATES_JSON\b"),
+        "Deprecated alias 'CANDIDATES_JSON' is stale guidance in docs/examples. Use canonical candidate inputs (`SCOUT_JSON`, `ANALYST_JSON`, or `ARCHITECT_JSON`) instead.",
+    ),
+    (
+        re.compile(r"\bIMPLEMENT_RESULT_JSON\b"),
+        "Deprecated alias 'IMPLEMENT_RESULT_JSON' is stale guidance in docs/examples. Use canonical `IMPLEMENT_JSON` instead.",
+    ),
+    (
+        re.compile(r"\bpr_spec\.files_touched\b"),
+        "Stale field path 'pr_spec.files_touched' found in docs/examples. Refer to the PRSpec `files_touched` field instead.",
+    ),
+    (
+        re.compile(r"\bpytest\s+tools/tests/"),
+        "Stale test command found in docs/examples. Use the unittest-based commands from `.github/workflows/test.yml` instead.",
+    ),
 )
 
 
@@ -97,6 +127,20 @@ def validate_placeholder_text(path: Path, text: str) -> list[ContractIssue]:
                     severity="error",
                     path=path,
                     message=f"Unknown placeholder '{placeholder}'. Add it to tools/contract_registry.py or fix the reference.",
+                )
+            )
+    return issues
+
+
+def validate_stale_text_patterns(path: Path, text: str) -> list[ContractIssue]:
+    issues: list[ContractIssue] = []
+    for pattern, message in STALE_TEXT_PATTERNS:
+        if pattern.search(text):
+            issues.append(
+                ContractIssue(
+                    severity="error",
+                    path=path,
+                    message=message,
                 )
             )
     return issues
@@ -150,31 +194,43 @@ def validate_metadata_contracts(path: Path, payload: Any) -> list[ContractIssue]
     return issues
 
 
-def collect_contract_issues(root_dir: Path) -> list[ContractIssue]:
-    issues: list[ContractIssue] = []
+def iter_contract_text_files(root_dir: Path) -> list[Path]:
+    files: set[Path] = set()
 
     prompts_dir = root_dir / "prompts"
     if prompts_dir.exists():
-        for prompt_path in sorted(prompts_dir.glob("*.md")):
-            issues.extend(
-                validate_placeholder_text(
-                    prompt_path,
-                    prompt_path.read_text(encoding="utf-8"),
-                )
-            )
+        files.update(prompt_path for prompt_path in prompts_dir.glob("*.md") if prompt_path.is_file())
+
+    for doc_rel_path in DOC_FILES:
+        doc_path = root_dir / doc_rel_path
+        if doc_path.exists() and doc_path.is_file():
+            files.add(doc_path)
 
     skills_dir = root_dir / "skills"
     if skills_dir.exists():
         for skill_dir in sorted(skills_dir.glob("pr-factory-*")):
-            skill_md_path = skill_dir / "SKILL.md"
-            if skill_md_path.exists():
-                issues.extend(
-                    validate_placeholder_text(
-                        skill_md_path,
-                        skill_md_path.read_text(encoding="utf-8"),
-                    )
-                )
+            for pattern in SKILL_TEXT_PATTERNS:
+                files.update(path for path in skill_dir.glob(pattern) if path.is_file())
 
+    return sorted(files)
+
+
+def _is_prompt_file(root_dir: Path, path: Path) -> bool:
+    prompts_dir = root_dir / "prompts"
+    return prompts_dir in path.parents
+
+
+def collect_contract_issues(root_dir: Path) -> list[ContractIssue]:
+    issues: list[ContractIssue] = []
+    for text_path in iter_contract_text_files(root_dir):
+        text = text_path.read_text(encoding="utf-8")
+        issues.extend(validate_placeholder_text(text_path, text))
+        if not _is_prompt_file(root_dir, text_path):
+            issues.extend(validate_stale_text_patterns(text_path, text))
+
+    skills_dir = root_dir / "skills"
+    if skills_dir.exists():
+        for skill_dir in sorted(skills_dir.glob("pr-factory-*")):
             metadata_path = skill_dir / "metadata.json"
             if metadata_path.exists():
                 try:
@@ -182,16 +238,5 @@ def collect_contract_issues(root_dir: Path) -> list[ContractIssue]:
                 except json.JSONDecodeError:
                     continue
                 issues.extend(validate_metadata_contracts(metadata_path, metadata_payload))
-
-    for doc_rel_path in DOC_FILES:
-        doc_path = root_dir / doc_rel_path
-        if not doc_path.exists():
-            continue
-        issues.extend(
-            validate_placeholder_text(
-                doc_path,
-                doc_path.read_text(encoding="utf-8"),
-            )
-        )
 
     return sorted(issues, key=lambda item: (str(item.path), item.severity, item.message))

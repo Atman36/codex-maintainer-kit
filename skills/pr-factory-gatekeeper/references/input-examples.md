@@ -4,7 +4,7 @@ Examples of inputs for the Gatekeeper skill for testing and development.
 
 ## Example 1: Scout Output → Gatekeeper
 
-### CANDIDATES_JSON (from Scout)
+### SCOUT_JSON (candidate payload from Scout)
 
 ```json
 {
@@ -89,7 +89,7 @@ Examples of inputs for the Gatekeeper skill for testing and development.
 
 ## Example 2: With Critic Constraints
 
-### CANDIDATES_JSON (from Analyst)
+### ANALYST_JSON (candidate payload from Analyst)
 
 ```json
 {
@@ -145,7 +145,7 @@ Examples of inputs for the Gatekeeper skill for testing and development.
 
 ## Example 3: Multiple Candidates with Selection
 
-### CANDIDATES_JSON
+### Candidate payload
 
 ```json
 {
@@ -197,7 +197,7 @@ Examples of inputs for the Gatekeeper skill for testing and development.
 
 ## Example 4: Edge Case - No Valid Candidates
 
-### CANDIDATES_JSON
+### Candidate payload
 
 ```json
 {

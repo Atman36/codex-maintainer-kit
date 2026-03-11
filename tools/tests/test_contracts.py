@@ -68,6 +68,64 @@ class ContractRegistryTests(unittest.TestCase):
         self.assertEqual(issues[0].path, self.root / "README.md")
         self.assertIn("Unknown placeholder 'MISSING_ROOT_PLACEHOLDER'", issues[0].message)
 
+    def test_claude_md_is_scanned_for_stale_patterns(self):
+        (self.root / "CLAUDE.md").write_text(
+            "Run `pytest tools/tests/` before committing tool changes.\n",
+            encoding="utf-8",
+        )
+
+        issues = contract_registry.collect_contract_issues(self.root)
+
+        self.assertEqual(len(issues), 1)
+        self.assertEqual(issues[0].severity, "error")
+        self.assertEqual(issues[0].path, self.root / "CLAUDE.md")
+        self.assertIn("Stale test command", issues[0].message)
+
+    def test_workflow_doc_is_scanned_for_unknown_placeholders(self):
+        workflow_path = self.root / "skills" / "WORKFLOW.md"
+        workflow_path.parent.mkdir(parents=True, exist_ok=True)
+        workflow_path.write_text(
+            "Workflow input: {{MISSING_WORKFLOW_PLACEHOLDER}}\n",
+            encoding="utf-8",
+        )
+
+        issues = contract_registry.collect_contract_issues(self.root)
+
+        self.assertEqual(len(issues), 1)
+        self.assertEqual(issues[0].severity, "error")
+        self.assertEqual(issues[0].path, workflow_path)
+        self.assertIn("Unknown placeholder 'MISSING_WORKFLOW_PLACEHOLDER'", issues[0].message)
+
+    def test_skill_references_are_scanned_for_stale_aliases(self):
+        reference_path = self.root / "skills" / "pr-factory-gatekeeper" / "references" / "input-examples.md"
+        reference_path.parent.mkdir(parents=True, exist_ok=True)
+        reference_path.write_text(
+            "### CANDIDATES_JSON\n",
+            encoding="utf-8",
+        )
+
+        issues = contract_registry.collect_contract_issues(self.root)
+
+        self.assertEqual(len(issues), 1)
+        self.assertEqual(issues[0].severity, "error")
+        self.assertEqual(issues[0].path, reference_path)
+        self.assertIn("Deprecated alias 'CANDIDATES_JSON'", issues[0].message)
+
+    def test_skill_examples_are_scanned_for_unknown_placeholders(self):
+        example_path = self.root / "skills" / "pr-factory-reviewer" / "examples" / "example.md"
+        example_path.parent.mkdir(parents=True, exist_ok=True)
+        example_path.write_text(
+            "Example input: {{MISSING_EXAMPLE_PLACEHOLDER}}\n",
+            encoding="utf-8",
+        )
+
+        issues = contract_registry.collect_contract_issues(self.root)
+
+        self.assertEqual(len(issues), 1)
+        self.assertEqual(issues[0].severity, "error")
+        self.assertEqual(issues[0].path, example_path)
+        self.assertIn("Unknown placeholder 'MISSING_EXAMPLE_PLACEHOLDER'", issues[0].message)
+
     def test_implement_result_json_alias_reports_warning(self):
         prompts_dir = self.root / "prompts"
         prompts_dir.mkdir(parents=True, exist_ok=True)

@@ -151,9 +151,7 @@ Skills use placeholders that must be filled by orchestrator:
 | `{{CONSTRAINTS}}` | Additional constraints | (Custom) |
 | `{{ALLOWED_COMMANDS}}` | Allowed verification commands | (Custom) |
 
-Legacy aliases are still resolved by the runner for backward compatibility:
-`CANDIDATES_JSON` -> first available of `ANALYST_JSON`, `ARCHITECT_JSON`, `SCOUT_JSON`;
-`IMPLEMENT_RESULT_JSON` -> `IMPLEMENT_JSON`.
+Docs and examples use canonical placeholder names from `tools/contract_registry.py`; the runner keeps older aliases as an internal compatibility layer.
 
 ## Skill Structure
 
@@ -238,7 +236,7 @@ For refactoring opportunities:
 
 ### Reviewer → PR Writer
 - Status: `success` (not `retryable` or `needs_human`)
-- No unexpected files outside `pr_spec.files_touched`
+- No unexpected files outside the PRSpec `files_touched` list
 - No debug/noise findings left unresolved
 
 ## IDE Integration

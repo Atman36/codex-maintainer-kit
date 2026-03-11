@@ -14,11 +14,11 @@ Comprehensive guide to the PR Factory pipeline, stage details, and decision poin
 
 ## Pipeline Overview
 
-The PR Factory pipeline consists of 6 main stages plus a publish step and optional agents:
+The PR Factory pipeline consists of analysis stages, per-PR execution stages, and an optional publish step:
 
 **Main Pipeline:**
 1. **Scout** - Quick triage and candidate discovery
-2. **Analyst** - Deep analysis (optional, alternative to Scout)
+2. **Analyst** - Deep analysis (used in `full` mode after Scout)
 3. **Gatekeeper** - Candidate selection and PRSpec creation
 4. **Implementer** - Safe implementation
 5. **Reviewer** - Post-implementation diff quality gate
@@ -266,7 +266,7 @@ Repository → Scout → Critic → Gatekeeper → Implementer → Reviewer → 
 
 **Inputs:**
 - `{{REPO_ROOT}}` - Workspace path
-- `{{CANDIDATES_JSON}}` - Candidates from Scout/Analyst/Architect
+- One candidate payload from the active analysis path: `{{SCOUT_JSON}}`, `{{ANALYST_JSON}}`, or `{{ARCHITECT_JSON}}`
 - `{{MAX_PRS}}` - Maximum PRs to select (default: 1)
 
 **Process:**
@@ -384,7 +384,7 @@ Repository → Scout → Critic → Gatekeeper → Implementer → Reviewer → 
 **Inputs:**
 - `{{REPO_ROOT}}` - Workspace path
 - `{{PRSPEC_JSON}}` - Approved PRSpec
-- `{{IMPLEMENT_RESULT_JSON}}` - Implementation result from Implementer
+- `{{IMPLEMENT_JSON}}` - Implementation result from Implementer
 - `{{DIFF_SUMMARY}}` - Git diff summary (optional)
 
 **Output:** ExecutionResult with:
@@ -403,7 +403,7 @@ Repository → Scout → Critic → Gatekeeper → Implementer → Reviewer → 
 ```
 
 **Success Criteria:**
-- No unexpected files outside `pr_spec.files_touched`
+- No unexpected files outside the PRSpec `files_touched` list
 - No obvious debug/noise leftovers
 
 **Next Step:**
@@ -415,7 +415,7 @@ Repository → Scout → Critic → Gatekeeper → Implementer → Reviewer → 
 
 **Inputs:**
 - `{{REPO_ROOT}}` - Workspace path
-- `{{IMPLEMENT_RESULT_JSON}}` - Implementation result from Implementer
+- `{{IMPLEMENT_JSON}}` - Implementation result from Implementer
 - `{{DIFF_SUMMARY}}` - Git diff summary (optional)
 
 **Process:**

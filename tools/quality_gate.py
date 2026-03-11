@@ -181,6 +181,22 @@ def repo_signals(repo_root: Path) -> Dict[str, Any]:
     }
 
 
+def is_ci_path(path: str) -> bool:
+    pn = path.lower().replace("\\", "/").strip("/")
+    if pn.startswith(".github/workflows/") and (pn.endswith(".yml") or pn.endswith(".yaml")):
+        return True
+    return pn in {
+        ".gitlab-ci.yml",
+        ".travis.yml",
+        "azure-pipelines.yml",
+        "bitbucket-pipelines.yml",
+        ".circleci/config.yml",
+        ".circleci/config.yaml",
+        ".buildkite/pipeline.yml",
+        ".buildkite/pipeline.yaml",
+    }
+
+
 def classify_paths(paths: List[str]) -> Dict[str, int]:
     """
     Rough classification for mergeability scoring.
@@ -192,10 +208,10 @@ def classify_paths(paths: List[str]) -> Dict[str, int]:
         pn = p.lower()
         if any(k in pn for k in ["readme", "docs/", "doc/", ".md", ".rst"]):
             buckets["docs"] += 1
+        elif is_ci_path(pn):
+            buckets["ci"] += 1
         elif any(k in pn for k in ["test", "spec", "__tests__", "pytest"]):
             buckets["tests"] += 1
-        elif pn.startswith(".github/workflows/") or pn.endswith(".yml") or pn.endswith(".yaml") and ".github" in pn:
-            buckets["ci"] += 1
         elif any(pn.endswith(x) for x in [".lock", "package.json", "pyproject.toml", "requirements.txt", "go.mod"]):
             buckets["build"] += 1
         elif any(pn.endswith(x) for x in [".toml", ".ini", ".cfg", ".editorconfig"]) or pn.startswith(".github/"):

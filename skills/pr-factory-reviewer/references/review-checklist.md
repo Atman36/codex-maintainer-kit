@@ -2,7 +2,7 @@
 
 ## Scope Discipline
 
-- `changed_files` must be subset of `pr_spec.files_touched` (unless explicitly justified).
+- `changed_files` must be subset of the PRSpec `files_touched` list (unless explicitly justified).
 - Diff size should be close to PRSpec estimate (roughly within ±20-30%).
 - No hidden broad refactors.
 
