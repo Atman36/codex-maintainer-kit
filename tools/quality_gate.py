@@ -14,6 +14,7 @@ import argparse
 import fnmatch
 import json
 import re
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,7 +27,7 @@ TOOLS_DIR = Path(__file__).resolve().parent
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
-from pr_factory_lib.git_utils import git_status_entries, git_status_paths, is_git_repo, run_git  # noqa: E402
+from pr_factory_lib.git_utils import StatusEntry, git_status_entries, git_status_paths, is_git_repo, run_git  # noqa: E402
 
 DEFAULT_FORBIDDEN_GLOBS = [
     ".agentplane/**",
@@ -328,23 +329,32 @@ def detect_unplanned_paths(changed_paths: List[str], allowed_patterns: List[str]
     return sorted([p for p in changed_paths if not matches_allowed(p, allowed_patterns)])
 
 
+def _run_command(args: List[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        args,
+        cwd=str(cwd),
+        capture_output=True,
+        text=True,
+    )
+
+
 def _run_restore(repo_root: Path, tracked_paths: List[str]) -> Optional[str]:
     if not tracked_paths:
         return None
 
     restore_cmd = ["git", "restore", "--staged", "--worktree", "--", *tracked_paths]
-    p = run(restore_cmd, cwd=repo_root)
+    p = _run_command(restore_cmd, cwd=repo_root)
     if p.returncode == 0:
         return None
 
     # Compatibility fallback for older git versions.
     checkout_cmd = ["git", "checkout", "--", *tracked_paths]
-    p_checkout = run(checkout_cmd, cwd=repo_root)
+    p_checkout = _run_command(checkout_cmd, cwd=repo_root)
     if p_checkout.returncode != 0:
         return p_checkout.stderr.strip() or p.stderr.strip() or "git restore/checkout failed"
 
     unstage_cmd = ["git", "reset", "HEAD", "--", *tracked_paths]
-    p_unstage = run(unstage_cmd, cwd=repo_root)
+    p_unstage = _run_command(unstage_cmd, cwd=repo_root)
     if p_unstage.returncode != 0:
         return p_unstage.stderr.strip() or "git reset HEAD failed while unstaging unplanned paths"
     return None
@@ -368,7 +378,7 @@ def cleanup_unplanned_paths(repo_root: Path,
 
     if untracked:
         clean_cmd = ["git", "clean", "-fd", "--", *untracked]
-        p_clean = run(clean_cmd, cwd=repo_root)
+        p_clean = _run_command(clean_cmd, cwd=repo_root)
         if p_clean.returncode != 0:
             errors.append(p_clean.stderr.strip() or "git clean failed for untracked unplanned paths")
         else:
