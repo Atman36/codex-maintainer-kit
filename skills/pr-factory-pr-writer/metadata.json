@@ -13,8 +13,8 @@
       "description": "Workspace path"
     },
     {
-      "name": "IMPLEMENT_RESULT_JSON",
-      "type": "object",
+      "name": "IMPLEMENT_JSON",
+      "type": "string",
       "required": true,
       "description": "Implementation result JSON (from Implementer)"
     },

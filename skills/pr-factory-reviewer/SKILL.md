@@ -20,7 +20,7 @@ Review the implemented diff as a maintainer would, before PR Writer.
 
 - `{{REPO_ROOT}}` - Workspace path
 - `{{PRSPEC_JSON}}` - Approved PRSpec (scope contract)
-- `{{IMPLEMENT_RESULT_JSON}}` - Implementer output JSON
+- `{{IMPLEMENT_JSON}}` - Implementer output JSON
 - `{{DIFF_SUMMARY}}` - Optional diff summary (`git diff --name-status`, `git diff --stat`)
 
 ## Goal

@@ -14,13 +14,13 @@
     },
     {
       "name": "PRSPEC_JSON",
-      "type": "object",
+      "type": "string",
       "required": true,
       "description": "Approved PRSpec (scope contract)"
     },
     {
-      "name": "IMPLEMENT_RESULT_JSON",
-      "type": "object",
+      "name": "IMPLEMENT_JSON",
+      "type": "string",
       "required": true,
       "description": "Implementer output JSON"
     },

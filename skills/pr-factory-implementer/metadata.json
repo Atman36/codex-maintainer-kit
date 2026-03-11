@@ -20,7 +20,7 @@
     },
     {
       "name": "PRSPEC_JSON",
-      "type": "object",
+      "type": "string",
       "required": true,
       "description": "PRSpec JSON (approved by Gatekeeper)"
     },

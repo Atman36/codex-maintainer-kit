@@ -3,7 +3,7 @@
 Workspace: `{{REPO_ROOT}}`
 Inputs:
 - PRSpec JSON: `{{PRSPEC_JSON}}`
-- Implementer result JSON: `{{IMPLEMENT_RESULT_JSON}}`
+- Implementer result JSON: `{{IMPLEMENT_JSON}}`
 - Diff summary (optional): `{{DIFF_SUMMARY}}`
 
 ## Goal

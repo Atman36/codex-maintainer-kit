@@ -138,15 +138,21 @@ Skills use placeholders that must be filled by orchestrator:
 | `{{REPO_URL}}` | Repository URL | `https://github.com/owner/repo` |
 | `{{BASE_BRANCH}}` | Target branch | `main`, `master` |
 | `{{HEAD_BRANCH}}` | Working branch | `fix/null-check` |
-| `{{CANDIDATES_JSON}}` | JSON from previous stage | (Scout/Analyst output) |
+| `{{ANALYST_JSON}}` | Analyst ExecutionResult JSON | (full mode output) |
+| `{{SCOUT_JSON}}` | Scout ExecutionResult JSON | (quick-win/full input) |
+| `{{ARCHITECT_JSON}}` | Architect ExecutionResult JSON | (architecture mode output) |
 | `{{CRITIC_JSON}}` | Critic decision JSON | (Critic output) |
 | `{{PRSPEC_JSON}}` | PRSpec JSON | (Gatekeeper output) |
-| `{{IMPLEMENT_RESULT_JSON}}` | Implementation result | (Implementer output) |
+| `{{IMPLEMENT_JSON}}` | Implementation result | (Implementer output) |
 | `{{RELATED_FILES}}` | High-signal files for scoped implementation | (Analyst/Scout output) |
 | `{{FOCUS}}` | Analysis focus | `docs`, `tests`, `bugfix` |
 | `{{MAX_PRS}}` | Maximum PRs to select | `1`, `3` |
 | `{{CONSTRAINTS}}` | Additional constraints | (Custom) |
 | `{{ALLOWED_COMMANDS}}` | Allowed verification commands | (Custom) |
+
+Legacy aliases are still resolved by the runner for backward compatibility:
+`CANDIDATES_JSON` -> first available of `ANALYST_JSON`, `ARCHITECT_JSON`, `SCOUT_JSON`;
+`IMPLEMENT_RESULT_JSON` -> `IMPLEMENT_JSON`.
 
 ## Skill Structure
 
@@ -300,7 +306,7 @@ For Critic:
 
 1. Validate JSON payload against schema: `../../schemas/execution_result.schema.json`
 2. For analysis stages, inspect file from `SAVED_JSON_PATH` in `/Users/Apple/Developer/pr-factory-kit/analysis_report/`
-3. Validate with: `python -m jsonschema schemas/execution_result.schema.json < output.json`
+3. Validate with: `python3 -m jsonschema schemas/execution_result.schema.json < output.json`
 
 ### Placeholders Not Filled
 

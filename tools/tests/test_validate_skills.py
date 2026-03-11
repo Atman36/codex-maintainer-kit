@@ -99,6 +99,13 @@ class ValidateSkillsTests(unittest.TestCase):
         exit_code = validate_skills.validate_skills(self.root)
         self.assertEqual(exit_code, 1)
 
+    def test_repository_contracts_have_no_issues(self):
+        repo_root = Path(__file__).resolve().parents[2]
+
+        issues = validate_skills.collect_contract_issues(repo_root)
+
+        self.assertEqual(issues, [])
+
 
 if __name__ == "__main__":
     unittest.main()

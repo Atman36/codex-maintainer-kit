@@ -21,7 +21,7 @@ Select candidates and shape them into minimal, mergeable PRSpecs.
 ## Inputs
 
 - `{{REPO_ROOT}}` - Workspace path
-- `{{CANDIDATES_JSON}}` - Candidate list JSON (from Scout or Analyst)
+- `{{ANALYST_JSON}}`, `{{SCOUT_JSON}}`, or `{{ARCHITECT_JSON}}` - Candidate list JSON path from the prior analysis stage
 - `{{CRITIC_JSON}}` - Optional critic decision JSON (if present, use as hard constraints)
 - `{{MAX_PRS}}` - Maximum number of PRs to select (default: 1)
 

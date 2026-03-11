@@ -2,7 +2,7 @@
 
 Workspace: `{{REPO_ROOT}}`
 Input:
-- Implementer result JSON: `{{IMPLEMENT_RESULT_JSON}}`
+- Implementer result JSON: `{{IMPLEMENT_JSON}}`
 - Git diff summary will be provided in `{{DIFF_SUMMARY}}`
 
 ## Goal

@@ -20,7 +20,7 @@ Produce clean, mergeable PR messages from implementation results.
 ## Inputs
 
 - `{{REPO_ROOT}}` - Workspace path
-- `{{IMPLEMENT_RESULT_JSON}}` - Implementation result JSON (from Implementer)
+- `{{IMPLEMENT_JSON}}` - Implementation result JSON (from Implementer)
 - `{{DIFF_SUMMARY}}` - Git diff summary (optional, will be generated if not provided)
 
 ## Goal

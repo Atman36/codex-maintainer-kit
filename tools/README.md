@@ -6,7 +6,7 @@ Helper scripts for PR Factory pipeline execution and validation.
 
 ```bash
 # Python 3.8+
-pip install jsonschema pyyaml
+python3 -m pip install -r requirements.txt
 
 # For Publisher stage (optional)
 # Install GitHub CLI: https://cli.github.com/
@@ -32,13 +32,13 @@ Pre-publish safety gate for PR Factory runs.
 #### Basic Check
 
 ```bash
-python tools/quality_gate.py --repo /path/to/repo --base-ref origin/main
+python3 tools/quality_gate.py --repo /path/to/repo --base-ref origin/main
 ```
 
 #### Check with PRSpec validation
 
 ```bash
-python tools/quality_gate.py \
+python3 tools/quality_gate.py \
   --repo /path/to/repo \
   --base-ref origin/main \
   --prspec prspec.json \
@@ -48,7 +48,7 @@ python tools/quality_gate.py \
 #### Strict enforcement (fail on unplanned files)
 
 ```bash
-python tools/quality_gate.py \
+python3 tools/quality_gate.py \
   --repo /path/to/repo \
   --prspec prspec.json \
   --enforce-files-touched
@@ -57,7 +57,7 @@ python tools/quality_gate.py \
 #### Auto-clean unplanned changes
 
 ```bash
-python tools/quality_gate.py \
+python3 tools/quality_gate.py \
   --repo /path/to/repo \
   --prspec prspec.json \
   --enforce-files-touched \
@@ -77,7 +77,7 @@ python tools/quality_gate.py \
 Override forbidden globs:
 
 ```bash
-python tools/quality_gate.py \
+python3 tools/quality_gate.py \
   --repo /path/to/repo \
   --forbidden ".agentplane/**" ".opencode/**" ".claude/**" ".kimi/**"
 ```
@@ -119,20 +119,20 @@ Validates integrity of local skill packages in `skills/`.
 ### Usage
 
 ```bash
-python tools/validate_skills.py
+python3 tools/validate_skills.py
 ```
 
 Optional root override:
 
 ```bash
-python tools/validate_skills.py --root /path/to/repo
+python3 tools/validate_skills.py --root /path/to/repo
 ```
 
 Validation policy:
 
 - Unknown placeholders fail validation.
-- Legacy aliases such as `{{IMPLEMENT_RESULT_JSON}}` and `{{CANDIDATES_JSON}}` warn but do not fail by themselves.
-- Metadata entries like `IMPLEMENT_RESULT_JSON` / `PRSPEC_JSON` / `SCOUT_JSON` fail if they claim `type: "object"`.
+- Canonical placeholders are preferred in prompts, skills, and docs; runner aliases remain supported for backward compatibility.
+- Metadata entries like `ANALYST_JSON` / `IMPLEMENT_JSON` / `PRSPEC_JSON` / `SCOUT_JSON` fail if they claim `type: "object"`.
 
 ### Exit Codes
 
@@ -175,46 +175,46 @@ Deterministic orchestrator for staged PR Factory execution.
 #### Full Pipeline (`auto` runner)
 
 ```bash
-python tools/run_pipeline.py \
+python3 tools/run_pipeline.py \
   --repo-root /path/to/repo \
   --repo-url https://github.com/owner/repo \
   --mode full \
   --focus tests \
   --max-prs 2 \
   --runner auto \
-  --stage-command scout='python tools/stages/scout.py --repo {{REPO_ROOT}}' \
-  --stage-command analyst='python tools/stages/analyst.py --input {{SCOUT_JSON}}' \
-  --stage-command critic='python tools/stages/critic.py --input {{ANALYST_JSON}}' \
-  --stage-command gatekeeper='python tools/stages/gatekeeper.py --input {{ANALYST_JSON}} --max-prs {{MAX_PRS}}' \
-  --stage-command implement='python tools/stages/implement.py --prspec {{PRSPEC_JSON}}' \
-  --stage-command reviewer='python tools/stages/reviewer.py --prspec {{PRSPEC_JSON}} --impl {{IMPLEMENT_JSON}}' \
-  --stage-command pr_writer='python tools/stages/pr_writer.py --prspec {{PRSPEC_JSON}} --impl {{IMPLEMENT_JSON}}' \
+  --stage-command scout='python3 tools/stages/scout.py --repo {{REPO_ROOT}}' \
+  --stage-command analyst='python3 tools/stages/analyst.py --input {{SCOUT_JSON}}' \
+  --stage-command critic='python3 tools/stages/critic.py --input {{ANALYST_JSON}}' \
+  --stage-command gatekeeper='python3 tools/stages/gatekeeper.py --input {{ANALYST_JSON}} --max-prs {{MAX_PRS}}' \
+  --stage-command implement='python3 tools/stages/implement.py --prspec {{PRSPEC_JSON}}' \
+  --stage-command reviewer='python3 tools/stages/reviewer.py --prspec {{PRSPEC_JSON}} --impl {{IMPLEMENT_JSON}}' \
+  --stage-command pr_writer='python3 tools/stages/pr_writer.py --prspec {{PRSPEC_JSON}} --impl {{IMPLEMENT_JSON}}' \
   --summary-output /tmp/pipeline-summary.json
 ```
 
 #### Force CLI Runner
 
 ```bash
-python tools/run_pipeline.py \
+python3 tools/run_pipeline.py \
   --repo-root /path/to/repo \
   --mode quick-win \
   --runner cli \
-  --stage-command scout='python tools/stages/scout.py --repo {{REPO_ROOT}}' \
-  --stage-command gatekeeper='python tools/stages/gatekeeper.py --input {{SCOUT_JSON}} --max-prs {{MAX_PRS}}' \
-  --stage-command implement='python tools/stages/implement.py --prspec {{PRSPEC_JSON}}' \
-  --stage-command reviewer='python tools/stages/reviewer.py --prspec {{PRSPEC_JSON}} --impl {{IMPLEMENT_JSON}}' \
-  --stage-command pr_writer='python tools/stages/pr_writer.py --prspec {{PRSPEC_JSON}}'
+  --stage-command scout='python3 tools/stages/scout.py --repo {{REPO_ROOT}}' \
+  --stage-command gatekeeper='python3 tools/stages/gatekeeper.py --input {{SCOUT_JSON}} --max-prs {{MAX_PRS}}' \
+  --stage-command implement='python3 tools/stages/implement.py --prspec {{PRSPEC_JSON}}' \
+  --stage-command reviewer='python3 tools/stages/reviewer.py --prspec {{PRSPEC_JSON}} --impl {{IMPLEMENT_JSON}}' \
+  --stage-command pr_writer='python3 tools/stages/pr_writer.py --prspec {{PRSPEC_JSON}}'
 ```
 
 #### Task Runner Wrapper
 
 ```bash
-python tools/run_pipeline.py \
+python3 tools/run_pipeline.py \
   --repo-root /path/to/repo \
   --mode full \
   --runner task \
   --task-runner-cmd 'task run --stage {{STAGE}} --command {{COMMAND}}' \
-  --stage-command scout='python tools/stages/scout.py --repo {{REPO_ROOT}}' \
+  --stage-command scout='python3 tools/stages/scout.py --repo {{REPO_ROOT}}' \
   ...
 ```
 
@@ -245,8 +245,8 @@ Legacy aliases kept for backward compatibility:
 
 | Alias | Resolves To |
 |-------|-------------|
-| `{{CANDIDATES_JSON}}` | First available of `{{ANALYST_JSON}}`, `{{ARCHITECT_JSON}}`, `{{SCOUT_JSON}}` |
-| `{{IMPLEMENT_RESULT_JSON}}` | `{{IMPLEMENT_JSON}}` |
+| `CANDIDATES_JSON` | First available of `ANALYST_JSON`, `ARCHITECT_JSON`, `SCOUT_JSON` |
+| `IMPLEMENT_RESULT_JSON` | `IMPLEMENT_JSON` |
 
 If a stage command still contains any unresolved `{{...}}` placeholder after expansion, the runner fails that stage before executing the shell command and surfaces a deterministic error.
 
@@ -280,23 +280,28 @@ Each stage must output valid JSON to stdout:
 }
 ```
 
-#### Critic Decision (special format)
+#### Critic ExecutionResult
 
 ```json
 {
-  "decision": "approve|revise|reject",
-  "top_reasons": ["..."],
-  "must_fix_before_implement": [],
-  "scope_cut": {
-    "keep": [],
-    "drop": [],
-    "split_into_separate_prs": []
+  "stage": "critic",
+  "status": "success",
+  "data": {
+    "decision": "approve|revise|reject",
+    "top_reasons": ["..."],
+    "must_fix_before_implement": [],
+    "scope_cut": {
+      "keep": [],
+      "drop": [],
+      "split_into_separate_prs": []
+    },
+    "merge_probability": {
+      "estimate": 0.9,
+      "drivers_positive": [],
+      "drivers_negative": []
+    }
   },
-  "merge_probability": {
-    "estimate": 0.9,
-    "drivers_positive": [],
-    "drivers_negative": []
-  }
+  "warnings": []
 }
 ```
 
@@ -315,7 +320,7 @@ Each stage must output valid JSON to stdout:
 
 | Symptom | Root cause | Fix |
 |---------|------------|-----|
-| `Detected skill names used as shell commands` | Skill ID passed as executable command in CLI mode | Use real command (`python ...`) or configure `--runner task` + `--task-runner-cmd` |
+| `Detected skill names used as shell commands` | Skill ID passed as executable command in CLI mode | Use real command (`python3 ...`) or configure `--runner task` + `--task-runner-cmd` |
 | `Missing stage command(s)` | Not all required stage commands were provided | Add each missing `--stage-command stage=command` |
 | `Working tree is dirty` | Preflight clean-worktree policy | Commit/stash changes or rerun with `--allow-dirty` |
 | `Missing origin/<base>` | Base branch SHA cannot be resolved | `git fetch origin <base>` and rerun |
@@ -335,11 +340,11 @@ Each stage must output valid JSON to stdout:
 
 ```bash
 # Validate JSON schemas
-python -m jsonschema schemas/execution_result.schema.json -i <(echo '{...}')
-python -m jsonschema schemas/prspec.schema.json -i <(echo '{...}')
-python -m jsonschema schemas/pipeline_summary.schema.json -i <(echo '{...}')
+python3 -m jsonschema schemas/execution_result.schema.json -i <(echo '{...}')
+python3 -m jsonschema schemas/prspec.schema.json -i <(echo '{...}')
+python3 -m jsonschema schemas/pipeline_summary.schema.json -i <(echo '{...}')
 # Run pipeline integration tests
-python -m unittest tools/tests/test_run_pipeline.py
+python3 -m unittest tools/tests/test_run_pipeline.py
 ```
 
 ---
@@ -374,7 +379,7 @@ export GITHUB_TOKEN=your_token_here
 #### Fetch all comments (JSON)
 
 ```bash
-python tools/fetch_pr_comments.py \
+python3 tools/fetch_pr_comments.py \
   owner/repo \
   --output pr_comments.json
 ```
@@ -382,7 +387,7 @@ python tools/fetch_pr_comments.py \
 #### Fetch only review comments (CSV for Excel)
 
 ```bash
-python tools/fetch_pr_comments.py \
+python3 tools/fetch_pr_comments.py \
   owner/repo \
   --type review \
   --format csv \
@@ -392,7 +397,7 @@ python tools/fetch_pr_comments.py \
 #### Filter by authors
 
 ```bash
-python tools/fetch_pr_comments.py \
+python3 tools/fetch_pr_comments.py \
   owner/repo \
   --authors "maintainer1,maintainer2" \
   --output maintainer_comments.json
@@ -401,7 +406,7 @@ python tools/fetch_pr_comments.py \
 #### Filter by date
 
 ```bash
-python tools/fetch_pr_comments.py \
+python3 tools/fetch_pr_comments.py \
   owner/repo \
   --since 2024-01-01 \
   --output recent_comments.json
@@ -410,7 +415,7 @@ python tools/fetch_pr_comments.py \
 #### Speed up large repos with parallel workers
 
 ```bash
-python tools/fetch_pr_comments.py \
+python3 tools/fetch_pr_comments.py \
   owner/repo \
   --max-prs 200 \
   --workers 16 \
@@ -420,7 +425,7 @@ python tools/fetch_pr_comments.py \
 #### Strict mode (fail if any PR request fails)
 
 ```bash
-python tools/fetch_pr_comments.py \
+python3 tools/fetch_pr_comments.py \
   owner/repo \
   --max-prs 100 \
   --strict-errors \
@@ -430,7 +435,7 @@ python tools/fetch_pr_comments.py \
 #### Incremental sync with resume state
 
 ```bash
-python tools/fetch_pr_comments.py \
+python3 tools/fetch_pr_comments.py \
   owner/repo \
   --state-file artifacts/pr_comments_state.json \
   --output incremental_comments.json
@@ -441,7 +446,7 @@ If `--since` is not provided, the script uses the timestamp from `--state-file`.
 #### Use PyGithub (if gh CLI not available)
 
 ```bash
-python tools/fetch_pr_comments.py \
+python3 tools/fetch_pr_comments.py \
   owner/repo \
   --prefer-pygithub \
   --token $GITHUB_TOKEN \

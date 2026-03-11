@@ -8,6 +8,11 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 QUALITY_GATE_PATH = REPO_ROOT / "tools" / "quality_gate.py"
+TOOLS_DIR = REPO_ROOT / "tools"
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
+import quality_gate  # noqa: E402
 
 
 def run_cmd(args, cwd):
@@ -107,6 +112,36 @@ class QualityGateCliTests(unittest.TestCase):
         self.assertFalse(report["files_touched_check"]["autoclean_applied"])
         self.assertEqual(report["files_touched_check"]["autocleaned_paths"], [])
         self.assertEqual(report["files_touched_check"]["unplanned_paths"], ["untracked.txt"])
+
+
+class QualityGateMergeProbabilityTests(unittest.TestCase):
+    def test_merge_probability_body_markdown_case_insensitive_bonus(self):
+        diff = quality_gate.DiffStats(files=1, insertions=4, deletions=0, paths=["tools/quality_gate.py"])
+        signals = {"ci_detected": True, "contributing_detected": True}
+        base_prspec = {
+            "risk": "low",
+            "test_plan": ["python3 -m unittest tools/tests/test_quality_gate.py"],
+        }
+
+        without_header = quality_gate.merge_probability(
+            dict(base_prspec, body_markdown="## What\nFixes scoring.\n"),
+            diff,
+            signals,
+            [],
+            [],
+        )
+        with_lowercase_header = quality_gate.merge_probability(
+            dict(base_prspec, body_markdown="## how tested\npython3 -m unittest tools/tests/test_quality_gate.py\n"),
+            diff,
+            signals,
+            [],
+            [],
+        )
+
+        self.assertAlmostEqual(
+            with_lowercase_header["probability"] - without_header["probability"],
+            0.02,
+        )
 
 
 if __name__ == "__main__":

@@ -279,7 +279,7 @@ def merge_probability(prspec: Optional[Dict[str, Any]],
             score -= 0.05; reasons.append("Missing explicit test plan.")
 
         body = prspec.get("body_markdown", "")
-        if isinstance(body, str) and ("How tested" in body or "How tested" in body.lower() or "How tested" in body):
+        if isinstance(body, str) and ("How tested" in body or "how tested" in body.lower()):
             score += 0.02
 
     # Clamp

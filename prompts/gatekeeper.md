@@ -2,7 +2,7 @@
 
 Workspace: `{{REPO_ROOT}}`
 Inputs:
-- Candidate list (JSON) will be provided in `{{CANDIDATES_JSON}}`
+- Candidate list (JSON) will be provided in one of `{{ANALYST_JSON}}`, `{{SCOUT_JSON}}`, or `{{ARCHITECT_JSON}}`
 - Critic output (optional) will be provided in `{{CRITIC_JSON}}`
 
 ## Goal

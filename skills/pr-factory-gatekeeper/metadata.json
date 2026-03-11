@@ -13,14 +13,14 @@
       "description": "Workspace path"
     },
     {
-      "name": "CANDIDATES_JSON",
-      "type": "object",
+      "name": "ANALYST_JSON",
+      "type": "string",
       "required": true,
-      "description": "Candidate list JSON (from Scout or Analyst)"
+      "description": "Candidate list JSON path (canonical input; runtime also accepts Scout or Architect outputs via alias resolution)"
     },
     {
       "name": "CRITIC_JSON",
-      "type": "object",
+      "type": "string",
       "required": false,
       "description": "Optional critic decision JSON (if present, use as hard constraints)"
     },

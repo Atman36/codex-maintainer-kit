@@ -22,7 +22,7 @@
     },
     {
       "name": "SCOUT_JSON",
-      "type": "object",
+      "type": "string",
       "required": false,
       "description": "Optional Scout output for dynamic focus and config reuse"
     }

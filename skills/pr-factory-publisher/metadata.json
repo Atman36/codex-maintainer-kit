@@ -32,7 +32,7 @@
     },
     {
       "name": "PRSPEC_JSON",
-      "type": "object",
+      "type": "string",
       "required": true,
       "description": "Final PRSpec JSON (title/body)"
     }
