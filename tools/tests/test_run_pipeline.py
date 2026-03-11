@@ -163,6 +163,36 @@ class RunPipelineTests(unittest.TestCase):
         )
         return stage_stub
 
+    def write_stage_stub(self, name, source):
+        stage_stub = self.factory.root / name
+        stage_stub.write_text(textwrap.dedent(source).strip() + "\n", encoding="utf-8")
+        return stage_stub
+
+    def make_valid_pr_spec(self, spec_id="prspec-1"):
+        return {
+            "schema_version": "1.0",
+            "id": spec_id,
+            "repo": {
+                "url": "https://example.com/repo",
+                "owner": "o",
+                "name": "n",
+                "default_branch": "main",
+            },
+            "base": {"branch": "main"},
+            "head": {"branch": f"feature/{spec_id}"},
+            "title": f"Spec {spec_id} title",
+            "body_markdown": "## What\nValid spec\n\n## Why\nValidation coverage\n\n## How to verify\n```bash\necho ok\n```",
+            "change_type": "test",
+            "risk": "low",
+            "files_touched": ["README.md"],
+            "test_plan": ["echo ok"],
+            "ai_assistance": {
+                "used": True,
+                "tools": [{"name": "codex", "role": "test"}],
+                "disclosure_line": "AI assisted",
+            },
+        }
+
     def run_alias_pipeline(self, mode):
         repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)
         stage_stub = self.write_alias_stage_stub()
@@ -218,6 +248,30 @@ class RunPipelineTests(unittest.TestCase):
                 "--runner",
                 "cli",
                 *stage_commands,
+            ]
+        )
+        return run_pipeline.run_pipeline(args)
+
+    def run_quick_win_pipeline_with_stub(self, repo, stage_stub):
+        py = shlex.quote(str(stage_stub))
+        args = run_pipeline.parse_args(
+            [
+                "--repo-root",
+                str(repo),
+                "--mode",
+                "quick-win",
+                "--runner",
+                "cli",
+                "--stage-command",
+                f"scout=python3 {py} scout",
+                "--stage-command",
+                f"gatekeeper=python3 {py} gatekeeper",
+                "--stage-command",
+                f"implement=python3 {py} implement {{{{PRSPEC_JSON}}}}",
+                "--stage-command",
+                f"reviewer=python3 {py} reviewer {{{{PRSPEC_JSON}}}}",
+                "--stage-command",
+                f"pr_writer=python3 {py} pr_writer {{{{PRSPEC_JSON}}}}",
             ]
         )
         return run_pipeline.run_pipeline(args)
@@ -369,6 +423,202 @@ class RunPipelineTests(unittest.TestCase):
         self.assertEqual(run_result.exit_code, 1)
         self.assertIn("Unresolved placeholder(s) in stage command", run_result.stderr)
         self.assertFalse(marker.exists())
+
+    def test_invalid_execution_result_rejected_at_stage_boundary(self):
+        stage_stub = self.write_stage_stub(
+            "invalid_execution_result_stub.py",
+            """
+            import json
+
+            print(json.dumps({
+                "schema_version": "1.0",
+                "id": "scout-id",
+                "stage": "scout",
+                "summary": "missing status",
+                "started_at": "2026-01-01T00:00:00Z",
+                "finished_at": "2026-01-01T00:00:00Z",
+                "exit_code": 0,
+                "stdout": "",
+                "stderr": "",
+                "artifacts": [],
+                "metrics": {
+                    "duration_ms": 1,
+                    "cost_usd": 0.0,
+                    "tokens_in": 0,
+                    "tokens_out": 0
+                },
+                "errors": [],
+                "warnings": [],
+                "data": {}
+            }))
+            """,
+        )
+
+        run_result, attempts, retry_trace = run_pipeline.execute_stage_with_retries(
+            adapter=run_pipeline.CliRunnerAdapter(),
+            stage="scout",
+            command_template=f"python3 {shlex.quote(str(stage_stub))}",
+            cwd=self.factory.root,
+            template_values={},
+            max_attempts=1,
+        )
+
+        self.assertEqual(attempts, 1)
+        self.assertEqual(len(retry_trace), 1)
+        self.assertEqual(run_result.exit_code, 1)
+        self.assertIn("ExecutionResult validation", run_result.stderr)
+        self.assertIn("field: status", run_result.stderr)
+        self.assertIn("schema: required", run_result.stderr)
+
+    def test_invalid_top_level_pr_spec_rejected_before_implement_stage(self):
+        repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)
+        invalid_spec = self.make_valid_pr_spec("prspec-invalid-top")
+        invalid_spec["risk"] = "critical"
+        stage_stub = self.write_stage_stub(
+            "invalid_top_level_prspec_stub.py",
+            f"""
+            import json
+            import sys
+
+            TS = "2026-01-01T00:00:00Z"
+            PR_SPEC = {repr(invalid_spec)}
+
+            def emit(stage, data=None, pr_spec=None):
+                payload = {{
+                    "schema_version": "1.0",
+                    "id": f"{{stage}}-id",
+                    "stage": stage,
+                    "status": "success",
+                    "summary": "ok",
+                    "started_at": TS,
+                    "finished_at": TS,
+                    "exit_code": 0,
+                    "stdout": "",
+                    "stderr": "",
+                    "artifacts": [],
+                    "metrics": {{
+                        "duration_ms": 1,
+                        "cost_usd": 0.0,
+                        "tokens_in": 0,
+                        "tokens_out": 0,
+                    }},
+                    "errors": [],
+                    "warnings": [],
+                    "data": data or {{}},
+                }}
+                if pr_spec is not None:
+                    payload["pr_spec"] = pr_spec
+                print(json.dumps(payload))
+
+            stage = sys.argv[1]
+            if stage == "scout":
+                emit("scout", data={{"candidates": [{{"id": "cand-1"}}]}})
+            elif stage == "gatekeeper":
+                emit("gatekeeper", data={{"selected": [{{"candidate_id": "cand-1", "decision": "pr"}}]}}, pr_spec=PR_SPEC)
+            elif stage == "implement":
+                raise SystemExit("implement should not run")
+            else:
+                emit(stage)
+            """,
+        )
+
+        exit_code, payload = self.run_quick_win_pipeline_with_stub(repo=repo, stage_stub=stage_stub)
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(payload["status"], "needs_human")
+        self.assertFalse(payload["data"]["pr_results"])
+        self.assertIn("Stage 'gatekeeper' output", payload["stderr"])
+        self.assertIn("$.pr_spec.risk", payload["stderr"])
+        self.assertIn("field: risk", payload["stderr"])
+
+    def test_invalid_data_pr_specs_rejected(self):
+        repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)
+        invalid_spec = self.make_valid_pr_spec("prspec-invalid-list")
+        invalid_spec["risk"] = "critical"
+        stage_stub = self.write_stage_stub(
+            "invalid_data_prspecs_stub.py",
+            f"""
+            import json
+            import sys
+
+            TS = "2026-01-01T00:00:00Z"
+            PR_SPEC = {repr(invalid_spec)}
+
+            def emit(stage, data=None):
+                print(json.dumps({{
+                    "schema_version": "1.0",
+                    "id": f"{{stage}}-id",
+                    "stage": stage,
+                    "status": "success",
+                    "summary": "ok",
+                    "started_at": TS,
+                    "finished_at": TS,
+                    "exit_code": 0,
+                    "stdout": "",
+                    "stderr": "",
+                    "artifacts": [],
+                    "metrics": {{
+                        "duration_ms": 1,
+                        "cost_usd": 0.0,
+                        "tokens_in": 0,
+                        "tokens_out": 0,
+                    }},
+                    "errors": [],
+                    "warnings": [],
+                    "data": data or {{}},
+                }}))
+
+            stage = sys.argv[1]
+            if stage == "scout":
+                emit("scout", data={{"candidates": [{{"id": "cand-1"}}]}})
+            elif stage == "gatekeeper":
+                emit(
+                    "gatekeeper",
+                    data={{
+                        "selected": [{{"candidate_id": "cand-1", "decision": "pr"}}],
+                        "pr_specs": [PR_SPEC],
+                    }},
+                )
+            elif stage == "implement":
+                raise SystemExit("implement should not run")
+            else:
+                emit(stage)
+            """,
+        )
+
+        exit_code, payload = self.run_quick_win_pipeline_with_stub(repo=repo, stage_stub=stage_stub)
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(payload["status"], "needs_human")
+        self.assertFalse(payload["data"]["pr_results"])
+        self.assertIn("Stage 'gatekeeper' output at data.pr_specs[0]", payload["stderr"])
+        self.assertIn("$.risk", payload["stderr"])
+        self.assertIn("field: risk", payload["stderr"])
+
+    def test_raw_critic_payload_rejected(self):
+        stage_stub = self.write_stage_stub(
+            "raw_critic_payload_stub.py",
+            """
+            import json
+
+            print(json.dumps({"decision": "approve"}))
+            """,
+        )
+
+        run_result, attempts, retry_trace = run_pipeline.execute_stage_with_retries(
+            adapter=run_pipeline.CliRunnerAdapter(),
+            stage="critic",
+            command_template=f"python3 {shlex.quote(str(stage_stub))}",
+            cwd=self.factory.root,
+            template_values={},
+            max_attempts=1,
+        )
+
+        self.assertEqual(attempts, 1)
+        self.assertEqual(len(retry_trace), 1)
+        self.assertEqual(run_result.exit_code, 1)
+        self.assertIn("Stage 'critic' output failed ExecutionResult validation", run_result.stderr)
+        self.assertIn("field: decision", run_result.stderr)
 
     def test_multi_pr_partial_failure_keeps_other_results(self):
         repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)

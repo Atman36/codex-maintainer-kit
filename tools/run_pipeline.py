@@ -32,6 +32,7 @@ if str(TOOLS_DIR) not in sys.path:
 
 from pr_factory_lib.git_utils import run_git  # noqa: E402
 from pr_factory_lib.json_utils import parse_stage_output, write_json  # noqa: E402
+from pr_factory_lib.schema_utils import validate_stage_payload  # noqa: E402
 
 
 MODE_ANALYSIS_STAGE_ORDER: Dict[str, List[str]] = {
@@ -214,6 +215,7 @@ def run_stage(
     payload: Optional[Dict[str, Any]] = None
     if proc.returncode == 0:
         payload = parse_stage_output(proc.stdout)
+        validate_stage_payload(payload=payload, expected_stage=stage)
     return StageRun(
         stage=stage,
         command=command,
@@ -676,7 +678,7 @@ def execute_stage_with_retries(
                 template_values=template_values,
                 extra_env=extra_env,
             )
-        except ValueError as exc:
+        except (RuntimeError, ValueError) as exc:
             run_result = StageRun(
                 stage=stage,
                 command=command_template,
