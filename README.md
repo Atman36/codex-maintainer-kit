@@ -1,4 +1,6 @@
-# PR Factory Kit (prompts + contracts + quality gate)
+# PR Factory Kit
+
+Open toolkit for deterministic multi-agent PR pipelines: prompts, JSON schemas, quality gates, and orchestration tools for small, mergeable improvements.
 
 This kit is designed for a multi-agent PR pipeline:
 Scout → Analyst → Critic → Gatekeeper → Implementer → Reviewer → PR Writer → Publisher.
@@ -51,3 +53,7 @@ python3 -m pip install -e .
 - Hand `program.md` to a chat agent when you want the shortest possible entrypoint.
 - Use `prompts/pipeline.md` when you need the end-to-end workflow contract directly.
 - Use `tools/README.md` for the fully expanded `run_pipeline.py` CLI examples.
+
+## License
+
+MIT. See `LICENSE`.
