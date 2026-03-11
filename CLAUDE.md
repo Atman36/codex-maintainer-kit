@@ -4,12 +4,18 @@
 
 Multi-agent PR pipeline: Scout → Analyst → Critic → Gatekeeper → Implementer → Reviewer → PR Writer → Publisher.
 
+## Fastest Entrypoint
+
+- Start with `program.md` when you want the shortest agent-facing file for this repository.
+- Use it to understand what to read first, which workflow is primary, and which constraints are mandatory.
+
 ## Skills
 
 See `AGENTS.md` for the full list of available skills and trigger rules.
 
 ## Key Files
 
+- `program.md` — shortest agent-facing entrypoint for the repo
 - `tools/quality_gate.py` — forbidden-files scanner + merge-probability heuristic + autoclean (CLI: `--autoclean-unplanned`)
 - `tools/run_pipeline.py` — deterministic DAG orchestrator (stage order + gate checks + retries)
 - `tools/contract_registry.py` — canonical placeholder registry + static contract validation
@@ -33,6 +39,12 @@ Canonical set (enforced by `contract_registry.py`) — key ones:
 - Per-stage JSON paths: `{{SCOUT_JSON}}`, `{{ANALYST_JSON}}`, `{{ARCHITECT_JSON}}`, `{{CRITIC_JSON}}`, `{{GATEKEEPER_JSON}}`, `{{IMPLEMENT_JSON}}`, `{{REVIEWER_JSON}}`, `{{PRSPEC_JSON}}`
 
 Unresolved placeholders cause fail-fast in `run_pipeline.py` (preflight check).
+
+## Run Notes
+
+- `tools/run_pipeline.py` is the preferred deterministic orchestrator.
+- Do not present `python tools/run_pipeline.py` by itself as a runnable example; real runs require the needed `--stage-command` values.
+- For the full CLI shape, refer to `tools/README.md` or start with `python3 tools/run_pipeline.py --help`.
 
 ## Rules
 
