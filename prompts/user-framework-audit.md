@@ -44,6 +44,7 @@
 - `skills/README.md`
 - `skills/pr-factory-pipeline/SKILL.md`
 - все релевантные `skills/pr-factory-*/SKILL.md`
+- `CLAUDE.md` как краткий project-facing digest, если он есть
 - `prompts/README.md`
 - релевантные файлы в `prompts/`
 - `tools/README.md`
@@ -51,16 +52,19 @@
 - `tools/quality_gate.py`
 - `tools/validate_skills.py`
 - `tools/contract_registry.py`
+- `tools/make_agent_audit_archive.py`
 - тесты в `tools/tests/`
 - схемы в `schemas/`
-- `FRAMEWORK_IMPROVEMENTS_2026-03-11.md`
-- `specs/audit-report-2026-03-11/INDEX.md`
+- `config/pipeline_modes.json`
+- workflow-файлы в `.github/workflows/`
 
 Не компенсируй пробелы догадками. Если информации не хватает, дочитай код и документы.
 
 ## Важно: что уже, вероятно, исправлено
 
-В `specs/audit-report-2026-03-11/INDEX.md` уже отмечены как выполненные несколько прошлых доработок. Не повторяй их автоматически как “open”.
+В репозитории уже было несколько волн доработок runner/contracts/docs/tests. Не повторяй автоматически старые pain points как “open” только потому, что ты ожидаешь увидеть их в таком фреймворке.
+
+Если у тебя есть внешний аудит в `deepresearch/` или другом переданном контексте, используй его как набор гипотез для проверки, а не как источник истины.
 
 Перепроверь фактическое состояние и для каждого такого пункта дай один из статусов:
 - `resolved` — действительно исправлено и подтверждается кодом / тестами / docs;
@@ -227,7 +231,7 @@
 - top issues: баги, contract drift, хрупкие места, архитектурные риски;
 - improvement opportunities: системные улучшения;
 - new feature opportunities: 3–7 небольших и уместных функций;
-- resolved vs still-open: какие пункты из `FRAMEWORK_IMPROVEMENTS_2026-03-11.md` и `specs/audit-report-2026-03-11/INDEX.md` уже закрыты, а какие ещё живы или регресснули.
+- resolved vs still-open: какие ранее известные проблемы и гипотезы уже закрыты, а какие ещё живы, частично закрыты или регресснули.
 
 ### Блок 2. Candidate List
 
