@@ -1,5 +1,23 @@
 # Second Pass Progress
 
+## Verified On Current Tree
+
+Commands run from repo root on 2026-03-11:
+- `python3 tools/validate_skills.py`
+- `python3 -m unittest tools.tests.test_contracts`
+- targeted source checks against `tools/run_pipeline.py`, `tools/contract_registry.py`, `README.md`
+
+Confirmed done:
+- Repository-level skill validation is green on the current checkout.
+- Contract registry tests pass on the current checkout.
+- Metadata `*_JSON` path-vs-object contract drift is no longer present in scanned PR Factory skills.
+
+Confirmed still open:
+- `gatekeeper` fan-out still ignores top-level `status` and only checks decision / embedded PRSpec presence.
+- `collect_top_improvements()` still ignores `data.candidate`, so architecture mode can still lose its primary signal.
+- Root docs are still outside `DOC_FILES`, and `README.md` still contains dead `{{CONTEXT}}`.
+- Hardcoded `/Users/Apple/Developer/pr-factory-kit/analysis_report/...` paths still exist across prompts/skills/docs.
+
 ## Done
 
 - Fixed all scanned `metadata.json` `*_JSON` inputs to use `type: "string"`.
