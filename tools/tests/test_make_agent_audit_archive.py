@@ -57,6 +57,7 @@ class MakeAgentAuditArchiveTests(unittest.TestCase):
         self.write_file("README.md", "ok\n")
         self.write_file("prompts/user-framework-audit.md", "prompt\n")
         self.write_file(".DS_Store", "junk\n")
+        self.write_file("skills/example/.DS_Store", "nested junk\n")
         self.write_file("analysis_report/run.json", "{}\n")
         self.write_file("artifacts/log.txt", "ignore\n")
         self.write_file("tools/__pycache__/cache.pyc", "x\n")

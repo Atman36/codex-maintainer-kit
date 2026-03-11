@@ -21,11 +21,12 @@ TOOLS_DIR = Path(__file__).resolve().parent
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
-from pr_factory_lib.git_utils import run_git
+from pr_factory_lib.git_utils import git_status_paths, run_git
 
 
 DEFAULT_EXCLUDES = (
     ".DS_Store",
+    "**/.DS_Store",
     ".git/**",
     ".claude/**",
     "analysis_report/**",
@@ -111,22 +112,28 @@ def should_exclude(path: str, patterns: Iterable[str]) -> bool:
     return False
 
 
-def read_blob(repo_root: Path, ref: str, path: str) -> bytes:
+def read_blob(repo_root: Path, ref: str, path: str, dirty_paths: set[str]) -> bytes:
     proc = subprocess.run(
         ["git", "show", f"{ref}:{path}"],
         cwd=str(repo_root),
         capture_output=True,
         check=False,
     )
-    if proc.returncode != 0:
-        stderr = proc.stderr.decode("utf-8", errors="replace").strip()
-        raise RuntimeError(stderr or f"git show failed for '{ref}:{path}'")
-    return proc.stdout
+    if proc.returncode == 0:
+        return proc.stdout
+
+    worktree_path = repo_root / path
+    if ref == "HEAD" and path not in dirty_paths and worktree_path.is_file():
+        return worktree_path.read_bytes()
+
+    stderr = proc.stderr.decode("utf-8", errors="replace").strip()
+    raise RuntimeError(stderr or f"git show failed for '{ref}:{path}'")
 
 
 def create_archive(repo_root: Path, ref: str, output_path: Path, prefix: str, excludes: Iterable[str]) -> List[str]:
     blobs = git_blobs(repo_root=repo_root)
     included_paths: List[str] = []
+    dirty_paths = set(git_status_paths(repo_root))
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with tarfile.open(output_path, "w:gz") as archive:
@@ -134,7 +141,7 @@ def create_archive(repo_root: Path, ref: str, output_path: Path, prefix: str, ex
             if should_exclude(blob.path, excludes):
                 continue
 
-            data = read_blob(repo_root=repo_root, ref=ref, path=blob.path)
+            data = read_blob(repo_root=repo_root, ref=ref, path=blob.path, dirty_paths=dirty_paths)
             tar_info = tarfile.TarInfo(name=f"{prefix}{blob.path}")
             tar_info.size = len(data)
             tar_info.mode = blob.mode
