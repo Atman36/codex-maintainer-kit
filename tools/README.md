@@ -159,6 +159,7 @@ Deterministic orchestrator for staged PR Factory execution.
    - `implement`, `reviewer`, `pr_writer`, `publish` → must be `success`
 6. Self-healing loop for Implementer (default: up to 3 attempts).
 7. Writes machine-readable `pipeline-summary.json` and embeds structured error blocks.
+8. Supports legacy placeholder aliases and fails fast if any `{{PLACEHOLDER}}` remains unresolved after expansion.
 
 ### Pipeline Modes
 
@@ -238,6 +239,15 @@ The following placeholders are supported in stage commands:
 | `{{GATEKEEPER_JSON}}` | Gatekeeper output | Previous stage |
 | `{{IMPLEMENT_JSON}}` | Implementer output | Previous stage |
 | `{{REVIEWER_JSON}}` | Reviewer output | Previous stage |
+
+Legacy aliases kept for backward compatibility:
+
+| Alias | Resolves To |
+|-------|-------------|
+| `{{CANDIDATES_JSON}}` | First available of `{{ANALYST_JSON}}`, `{{ARCHITECT_JSON}}`, `{{SCOUT_JSON}}` |
+| `{{IMPLEMENT_RESULT_JSON}}` | `{{IMPLEMENT_JSON}}` |
+
+If a stage command still contains any unresolved `{{...}}` placeholder after expansion, the runner fails that stage before executing the shell command and surfaces a deterministic error.
 
 ### Stage Output Contract
 

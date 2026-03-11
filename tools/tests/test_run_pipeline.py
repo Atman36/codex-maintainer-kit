@@ -68,6 +68,160 @@ class RunPipelineTests(unittest.TestCase):
     def tearDown(self):
         self.factory.cleanup()
 
+    def write_alias_stage_stub(self):
+        stage_stub = self.factory.root / "alias_stage_stub.py"
+        stage_stub.write_text(
+            textwrap.dedent(
+                """
+                import json
+                import sys
+                from pathlib import Path
+
+                TS = "2026-01-01T00:00:00Z"
+
+                def emit(stage, status="success", summary="ok", data=None, pr_spec=None):
+                    payload = {
+                        "schema_version": "1.0",
+                        "id": f"{stage}-id",
+                        "stage": stage,
+                        "status": status,
+                        "summary": summary,
+                        "started_at": TS,
+                        "finished_at": TS,
+                        "exit_code": 0,
+                        "stdout": "",
+                        "stderr": "",
+                        "artifacts": [],
+                        "metrics": {
+                            "duration_ms": 1,
+                            "cost_usd": 0.0,
+                            "tokens_in": 0,
+                            "tokens_out": 0,
+                        },
+                        "errors": [],
+                        "warnings": [],
+                        "data": data or {},
+                    }
+                    if pr_spec is not None:
+                        payload["pr_spec"] = pr_spec
+                    print(json.dumps(payload))
+
+                def make_pr_spec(candidate_id):
+                    return {
+                        "schema_version": "1.0",
+                        "id": f"prspec-{candidate_id}",
+                        "repo": {"url": "https://example.com/repo", "owner": "o", "name": "n", "default_branch": "main"},
+                        "base": {"branch": "main"},
+                        "head": {"branch": f"feature/{candidate_id}"},
+                        "title": f"Alias test {candidate_id}",
+                        "body_markdown": "## What\\nAlias test\\n\\n## Why\\nCoverage\\n\\n## How to verify\\n```bash\\npython3 -m unittest tools/tests/test_run_pipeline.py\\n```",
+                        "change_type": "test",
+                        "risk": "low",
+                        "files_touched": ["README.md"],
+                        "test_plan": ["python3 -m unittest tools/tests/test_run_pipeline.py"],
+                        "ai_assistance": {"used": True, "tools": [{"name": "codex", "role": "test"}], "disclosure_line": "AI assisted"},
+                    }
+
+                stage = sys.argv[1]
+                if stage == "scout":
+                    emit("scout", data={"candidates": [{"id": "cand-scout"}]})
+                elif stage == "analyst":
+                    source = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+                    emit("analyst", data={"candidates": [{"id": "cand-analyst", "source_stage": source["stage"]}]})
+                elif stage == "architect":
+                    emit("architect", data={"candidates": [{"id": "cand-architect"}]})
+                elif stage == "critic":
+                    emit("critic", data={"decision": "approve"})
+                elif stage == "gatekeeper":
+                    source = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+                    candidate_id = source["data"]["candidates"][0]["id"]
+                    pr_spec = make_pr_spec(candidate_id)
+                    emit(
+                        "gatekeeper",
+                        data={
+                            "selected": [{"candidate_id": candidate_id, "decision": "pr"}],
+                            "pr_specs": [pr_spec],
+                            "source_stage": source["stage"],
+                        },
+                        pr_spec=pr_spec,
+                    )
+                elif stage == "implement":
+                    pr_spec = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+                    emit("implement", data={"implemented": pr_spec["id"]})
+                elif stage == "reviewer":
+                    implement_result = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+                    emit("reviewer", data={"reviewed": implement_result["data"]["implemented"]})
+                elif stage == "pr_writer":
+                    pr_spec = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+                    emit("pr_writer", pr_spec=pr_spec)
+                else:
+                    raise SystemExit(f"unknown stage: {stage}")
+                """
+            ).strip()
+            + "\n",
+            encoding="utf-8",
+        )
+        return stage_stub
+
+    def run_alias_pipeline(self, mode):
+        repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)
+        stage_stub = self.write_alias_stage_stub()
+        py = shlex.quote(str(stage_stub))
+        stage_commands = [
+            "--stage-command",
+            f"implement=python3 {py} implement {{{{PRSPEC_JSON}}}}",
+            "--stage-command",
+            f"reviewer=python3 {py} reviewer {{{{IMPLEMENT_RESULT_JSON}}}}",
+            "--stage-command",
+            f"pr_writer=python3 {py} pr_writer {{{{PRSPEC_JSON}}}}",
+        ]
+
+        if mode == "quick-win":
+            stage_commands = [
+                "--stage-command",
+                f"scout=python3 {py} scout",
+                "--stage-command",
+                f"gatekeeper=python3 {py} gatekeeper {{{{CANDIDATES_JSON}}}}",
+                *stage_commands,
+            ]
+        elif mode == "full":
+            stage_commands = [
+                "--stage-command",
+                f"scout=python3 {py} scout",
+                "--stage-command",
+                f"analyst=python3 {py} analyst {{{{SCOUT_JSON}}}}",
+                "--stage-command",
+                f"critic=python3 {py} critic",
+                "--stage-command",
+                f"gatekeeper=python3 {py} gatekeeper {{{{CANDIDATES_JSON}}}}",
+                *stage_commands,
+            ]
+        elif mode == "architecture":
+            stage_commands = [
+                "--stage-command",
+                f"architect=python3 {py} architect",
+                "--stage-command",
+                f"critic=python3 {py} critic",
+                "--stage-command",
+                f"gatekeeper=python3 {py} gatekeeper {{{{CANDIDATES_JSON}}}}",
+                *stage_commands,
+            ]
+        else:
+            raise ValueError(f"unsupported mode: {mode}")
+
+        args = run_pipeline.parse_args(
+            [
+                "--repo-root",
+                str(repo),
+                "--mode",
+                mode,
+                "--runner",
+                "cli",
+                *stage_commands,
+            ]
+        )
+        return run_pipeline.run_pipeline(args)
+
     def test_runner_auto_fallbacks_to_cli(self):
         adapter, warnings = run_pipeline.select_runner(
             mode="auto",
@@ -162,6 +316,59 @@ class RunPipelineTests(unittest.TestCase):
         )
         self.assertFalse(result.passed)
         self.assertEqual(result.checks[-1].name, "publish_tooling")
+
+    def test_pipeline_supports_implement_result_alias(self):
+        exit_code, payload = self.run_alias_pipeline(mode="quick-win")
+
+        self.assertEqual(exit_code, 0)
+        pr_results = payload["data"]["pr_results"]
+        self.assertEqual(len(pr_results), 1)
+        self.assertEqual(pr_results[0]["status"], "success")
+        reviewer_summary = next(
+            item for item in pr_results[0]["stage_summary"] if item["stage"] == "reviewer"
+        )
+        self.assertIn("implement.json", reviewer_summary["command"])
+
+    def test_pipeline_supports_candidates_alias_across_modes(self):
+        expected_sources = {
+            "quick-win": "scout",
+            "full": "analyst",
+            "architecture": "architect",
+        }
+
+        for mode, expected_source in expected_sources.items():
+            with self.subTest(mode=mode):
+                exit_code, payload = self.run_alias_pipeline(mode=mode)
+                self.assertEqual(exit_code, 0)
+                gatekeeper_stage = next(
+                    item
+                    for item in payload["data"]["stage_summary"]
+                    if item["stage"] == "gatekeeper"
+                )
+                self.assertIn(f"{expected_source}.json", gatekeeper_stage["command"])
+                pr_spec = payload["data"]["pr_results"][0]["pr_spec"]
+                self.assertEqual(pr_spec["id"], f"prspec-cand-{expected_source}")
+
+    def test_unknown_placeholder_fails_before_stage_execution(self):
+        marker = self.factory.root / "unknown-placeholder-ran.txt"
+        command = shlex.quote(
+            f"from pathlib import Path; Path({str(marker)!r}).write_text('ran', encoding='utf-8')"
+        )
+
+        run_result, attempts, retry_trace = run_pipeline.execute_stage_with_retries(
+            adapter=run_pipeline.CliRunnerAdapter(),
+            stage="reviewer",
+            command_template=f"python3 -c {command} {{{{UNKNOWN_JSON}}}}",
+            cwd=self.factory.root,
+            template_values={},
+            max_attempts=1,
+        )
+
+        self.assertEqual(attempts, 1)
+        self.assertEqual(len(retry_trace), 1)
+        self.assertEqual(run_result.exit_code, 1)
+        self.assertIn("Unresolved placeholder(s) in stage command", run_result.stderr)
+        self.assertFalse(marker.exists())
 
     def test_multi_pr_partial_failure_keeps_other_results(self):
         repo = self.factory.create_repo(with_origin=True, push_origin=True, dirty=False)

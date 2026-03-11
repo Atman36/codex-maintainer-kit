@@ -41,6 +41,11 @@ MODE_ANALYSIS_STAGE_ORDER: Dict[str, List[str]] = {
 }
 
 IMPLEMENTATION_STAGES: List[str] = ["implement", "reviewer", "pr_writer"]
+PLACEHOLDER_ALIAS_PREFERENCES: Dict[str, Tuple[str, ...]] = {
+    "CANDIDATES_JSON": ("ANALYST_JSON", "ARCHITECT_JSON", "SCOUT_JSON"),
+    "IMPLEMENT_RESULT_JSON": ("IMPLEMENT_JSON",),
+}
+UNRESOLVED_PLACEHOLDER_RX = re.compile(r"\{\{([^{}]+)\}\}")
 
 
 @dataclass
@@ -157,9 +162,22 @@ def parse_stage_commands(items: List[str]) -> Dict[str, str]:
 
 
 def expand_template(template: str, values: Dict[str, str]) -> str:
+    resolved_values = dict(values)
+    for alias, candidates in PLACEHOLDER_ALIAS_PREFERENCES.items():
+        for candidate in candidates:
+            candidate_value = resolved_values.get(candidate, "")
+            if candidate_value:
+                resolved_values[alias] = candidate_value
+                break
+
     out = template
-    for k, v in values.items():
+    for k, v in resolved_values.items():
         out = out.replace("{{" + k + "}}", v)
+
+    unresolved = sorted({match.group(1).strip() for match in UNRESOLVED_PLACEHOLDER_RX.finditer(out)})
+    if unresolved:
+        unresolved_text = ", ".join(f"{{{{{name}}}}}" for name in unresolved)
+        raise ValueError(f"Unresolved placeholder(s) in stage command: {unresolved_text}")
     return out
 
 
@@ -661,7 +679,7 @@ def execute_stage_with_retries(
         except ValueError as exc:
             run_result = StageRun(
                 stage=stage,
-                command=adapter.build_command(stage=stage, expanded_command=expand_template(command_template, template_values)),
+                command=command_template,
                 exit_code=1,
                 stdout="",
                 stderr=str(exc),
