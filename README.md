@@ -70,3 +70,10 @@ python3 -m pip install -e .
 ## License
 
 MIT. See `LICENSE`.
+
+## Adoption & Ecosystem
+
+- **Maintainer workflow focus:** PR Factory Kit is designed for maintainers who review and merge contributions.
+- **Dogfooding:** The toolkit is actively used to improve its own codebase (see `case-studies/`).
+- **Ecosystem importance:** Helps reduce maintainer burden on small-to-medium OSS projects by automating triage, review, and test-gap detection.
+- **Projects analyzed:** See `case-studies/` for real-world usage examples.
