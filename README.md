@@ -5,6 +5,14 @@ Maintainer automation toolkit for safe, reviewable, human-gated pull requests. R
 The default pipeline is:
 Scout → Analyst → Critic → Gatekeeper → Implementer → Reviewer → PR Writer → Publisher.
 
+## Factual status
+
+- **Release status:** first public release is `v0.1.0`.
+- **Maintainer status:** this repository is maintained by its primary maintainer and is structured around human-approved OSS maintenance workflows.
+- **Adoption status:** early-stage public project; current evidence is dogfooding, documented case studies, and a roadmap for maintainer review, issue triage, release readiness, and security-aware checks.
+- **Ecosystem relevance:** intended to reduce review load for small-to-medium open-source projects by turning Codex-assisted analysis into scoped, auditable, maintainer-approved changes.
+- **Codex for Open Source fit:** the project maps directly to maintainer workflows covered by the program: pull request review, issue triage, release workflows, maintainer automation, and security-aware review support.
+
 ## Quick start
 
 ```bash
