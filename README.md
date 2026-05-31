@@ -1,9 +1,20 @@
 # PR Factory Kit
 
-Open toolkit for deterministic multi-agent PR pipelines: prompts, JSON schemas, quality gates, and orchestration tools for small, mergeable improvements.
+Maintainer automation toolkit for safe, reviewable, human-gated pull requests. Repo-local Codex skills, deterministic quality gates, and audit artifacts help open-source maintainers prepare small improvements without bypassing human approval.
 
-This kit is designed for a multi-agent PR pipeline:
+The default pipeline is:
 Scout → Analyst → Critic → Gatekeeper → Implementer → Reviewer → PR Writer → Publisher.
+
+## Safety-first design
+
+- **Human-gated publishing:** Publisher runs only after an explicit maintainer request.
+- **Quality gates:** forbidden-file scanning, secret detection, `files_touched` enforcement, and a conservative merge-probability heuristic live in `tools/quality_gate.py`.
+- **Scoped cleanup:** `--autoclean-unplanned` can restore files outside an approved PRSpec.
+- **Audit artifacts:** pipeline runs keep machine-readable summaries under `analysis_report/`.
+
+## Codex entrypoint
+
+Start with `CODEX.md` for Codex CLI usage and `.agents/skills/pr-factory-maintainer/SKILL.md` for the repo-local maintainer workflow.
 
 ## Fastest agent entrypoint
 
@@ -21,6 +32,8 @@ It plays the same role as a compact "operating program": what to read first, whi
 - `tools/run_pipeline.py` — deterministic DAG orchestrator (stage order + gate checks + implement retries).
 - `tools/fetch_pr_comments.py` — fetch PR comments (issue + review) from GitHub for analysis.
 - `tools/README.md` — how to run the gate locally / in CI.
+- `SAFETY.md` — human approval boundaries and quality-gate details.
+- `ROADMAP.md` — planned maintainer workflows and evidence milestones.
 
 ## Placeholders
 

@@ -4,11 +4,11 @@ Use this file as the shortest agent-facing entrypoint for the repository.
 
 ## What this repo is for
 
-`pr-factory-kit` is a framework for an ordered PR pipeline:
+`pr-factory-kit` is a maintainer automation toolkit that prepares small, safe, reviewable pull requests through an ordered pipeline:
 
 `Scout -> Analyst/Architect -> Critic -> Gatekeeper -> Implementer -> Reviewer -> PR Writer -> Publisher`
 
-The goal is to produce small, mergeable improvements with explicit quality gates and machine-readable JSON output.
+The goal is to reduce open-source maintainer review load with explicit human approval boundaries, quality gates, and machine-readable JSON output.
 
 ## In-scope files
 

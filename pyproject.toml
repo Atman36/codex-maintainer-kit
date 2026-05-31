@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pr-factory-kit"
 version = "0.1.0"
-description = "Open toolkit for deterministic multi-agent PR pipelines."
+description = "Maintainer automation toolkit for safe, reviewable, human-gated pull requests."
 readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}
