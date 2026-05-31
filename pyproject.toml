@@ -14,8 +14,8 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/Atman36/pr-factory-kit"
-Issues = "https://github.com/Atman36/pr-factory-kit/issues"
+Repository = "https://github.com/Atman36/codex-maintainer-kit"
+Issues = "https://github.com/Atman36/codex-maintainer-kit/issues"
 
 [tool.setuptools]
 package-dir = {"" = "tools"}

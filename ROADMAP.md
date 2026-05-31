@@ -1,6 +1,6 @@
 # Maintainer Automation Roadmap
 
-PR Factory Kit focuses on small, reviewable OSS maintenance tasks with human approval gates.
+Codex Maintainer Kit focuses on small, reviewable OSS maintenance tasks with human approval gates.
 
 ## Current foundation
 

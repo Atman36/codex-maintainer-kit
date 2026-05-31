@@ -1,6 +1,6 @@
 ---
 name: pr-factory-maintainer
-description: Prepare small, safe, reviewable OSS pull-request changes with PR Factory Kit. Use for maintainer triage, PRSpec creation, approved implementation, review, and PR drafting. Never publish without an explicit maintainer request.
+description: Prepare small, safe, reviewable OSS pull-request changes with Codex Maintainer Kit. Use for maintainer triage, PRSpec creation, approved implementation, review, and PR drafting. Never publish without an explicit maintainer request.
 ---
 
 # PR Factory Maintainer

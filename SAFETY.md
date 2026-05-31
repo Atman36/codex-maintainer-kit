@@ -1,6 +1,6 @@
 # Safety Policy
 
-PR Factory Kit prepares reviewable changes. It does not bypass maintainer approval.
+Codex Maintainer Kit prepares reviewable changes. It does not bypass maintainer approval.
 
 ## Human-gated publishing
 

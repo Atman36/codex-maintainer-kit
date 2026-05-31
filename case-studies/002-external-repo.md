@@ -70,4 +70,4 @@ Location: `src/click/parser.py`, around line 197.
 
 ## Outcome
 
-PRSpec prepared. Not published to the upstream repository — this case study serves as real-world evidence of how PR Factory Kit analyzes external OSS and produces a reviewable, low-risk diff.
+PRSpec prepared. Not published to the upstream repository — this case study serves as real-world evidence of how Codex Maintainer Kit analyzes external OSS and produces a reviewable, low-risk diff.

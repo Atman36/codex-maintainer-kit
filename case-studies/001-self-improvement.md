@@ -1,6 +1,6 @@
 # Case Study 001 — Self-Improvement of `tools/quality_gate.py`
 
-**Repository:** `pr-factory-kit` (this repo)  
+**Repository:** `codex-maintainer-kit` (this repo)
 **Date:** 2026-05-31  
 **Mode:** `quick-win` (Scout → Gatekeeper)  
 **Goal:** Detect gaps in secret-pattern coverage and improve the conservative secret scanner.

@@ -1,10 +1,10 @@
-# PR Factory Kit Program
+# Codex Maintainer Kit Program
 
 Use this file as the shortest agent-facing entrypoint for the repository.
 
 ## What this repo is for
 
-`pr-factory-kit` is a maintainer automation toolkit that prepares small, safe, reviewable pull requests through an ordered pipeline:
+`codex-maintainer-kit` is a maintainer automation toolkit that prepares small, safe, reviewable pull requests through an ordered pipeline:
 
 `Scout -> Analyst/Architect -> Critic -> Gatekeeper -> Implementer -> Reviewer -> PR Writer -> Publisher`
 

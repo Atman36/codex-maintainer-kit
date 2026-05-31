@@ -1,6 +1,6 @@
-# Using PR Factory Kit with Codex
+# Using Codex Maintainer Kit with Codex
 
-PR Factory Kit is a maintainer automation toolkit for preparing small, reviewable pull requests with explicit quality gates.
+Codex Maintainer Kit is a maintainer automation toolkit for preparing small, reviewable pull requests with explicit quality gates.
 
 ## Repo-local skill
 

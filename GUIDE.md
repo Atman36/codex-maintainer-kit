@@ -1,8 +1,8 @@
-# PR Factory Kit — Руководство пользователя
+# Codex Maintainer Kit — Руководство пользователя
 
 ## Что это такое
 
-PR Factory Kit — инструмент для сопровождающих open-source проектов. Он помогает находить маленькие безопасные улучшения, формировать PRSpec, запускать агентов Codex и сохранять проверяемый отчёт. Публикация Pull Request выполняется только по явному запросу человека.
+Codex Maintainer Kit — инструмент для сопровождающих open-source проектов. Он помогает находить маленькие безопасные улучшения, формировать PRSpec, запускать агентов Codex и сохранять проверяемый отчёт. Публикация Pull Request выполняется только по явному запросу человека.
 
 **Порядок агентов:**
 ```
@@ -17,8 +17,8 @@ Scout → Analyst/Architect → Critic → Gatekeeper → Implementer → Review
 
 ```bash
 # 1. Клонировать репозиторий
-git clone <url> pr-factory-kit
-cd pr-factory-kit
+git clone https://github.com/Atman36/codex-maintainer-kit.git
+cd codex-maintainer-kit
 
 # 2. Установить зависимости (только jsonschema)
 pip install -e .
@@ -270,7 +270,7 @@ BASE_BRANCH=main, MODE=full.
 ## Структура репозитория
 
 ```
-pr-factory-kit/
+codex-maintainer-kit/
 ├── program.md            # Самый короткий entrypoint для агента
 ├── prompts/               # Промпты для каждого агента + user-шаблоны
 │   ├── user-pipeline-full.md    # Шаблон: полный запуск

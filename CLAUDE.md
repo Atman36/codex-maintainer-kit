@@ -1,4 +1,4 @@
-# PR Factory Kit — Project Instructions
+# Codex Maintainer Kit — Project Instructions
 
 ## Overview
 

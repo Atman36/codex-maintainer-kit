@@ -1,9 +1,19 @@
-# PR Factory Kit
+# Codex Maintainer Kit
 
 Maintainer automation toolkit for safe, reviewable, human-gated pull requests. Repo-local Codex skills, deterministic quality gates, and audit artifacts help open-source maintainers prepare small improvements without bypassing human approval.
 
 The default pipeline is:
 Scout → Analyst → Critic → Gatekeeper → Implementer → Reviewer → PR Writer → Publisher.
+
+## Quick start
+
+```bash
+git clone https://github.com/Atman36/codex-maintainer-kit.git
+cd codex-maintainer-kit
+python3 -m pip install -e .
+```
+
+Start with `CODEX.md` for Codex CLI usage or hand `program.md` to an agent as the shortest repository entrypoint.
 
 ## Safety-first design
 
@@ -73,7 +83,7 @@ MIT. See `LICENSE`.
 
 ## Adoption & Ecosystem
 
-- **Maintainer workflow focus:** PR Factory Kit is designed for maintainers who review and merge contributions.
+- **Maintainer workflow focus:** Codex Maintainer Kit is designed for maintainers who review and merge contributions.
 - **Dogfooding:** The toolkit is actively used to improve its own codebase (see `case-studies/`).
 - **Ecosystem importance:** Helps reduce maintainer burden on small-to-medium OSS projects by automating triage, review, and test-gap detection.
 - **Projects analyzed:** See `case-studies/` for real-world usage examples.
